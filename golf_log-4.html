@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Golf Log</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
+.app{max-width:430px;margin:0 auto;padding:16px 12px 60px}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #d8d8d0}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:36px;height:36px;border-radius:10px;background:#1D9E75;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;flex-shrink:0}
+.logo-name{font-size:17px;font-weight:600;color:#1a1a1a;line-height:1.1}
+.logo-sub{font-size:11px;color:#888}
+.btn-add{display:flex;align-items:center;gap:5px;padding:9px 14px;border-radius:10px;background:#1D9E75;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer}
+.btn-add:active{background:#0F6E56}
+.nav{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:#e0e0d8;border-radius:12px;padding:3px;margin-bottom:16px;border:1px solid #d0d0c8}
+.nb{padding:9px 4px;border:none;background:transparent;border-radius:9px;font-size:13px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;font-weight:400}
+.nb.on{background:#fff;color:#1a1a1a;font-weight:600;border:1px solid #d0d0c8}
+.nb svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.sec{display:none}.sec.on{display:block}
+.card{background:#fff;border:1px solid #d8d8d0;border-radius:14px;padding:14px;margin-bottom:10px}
+.card-title{font-size:11px;font-weight:600;color:#999;letter-spacing:0.6px;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #ebebeb;display:flex;align-items:center;justify-content:space-between}
+
+/* weather */
+.weather-card{background:#fff;border:1px solid #d8d8d0;border-radius:14px;padding:14px;margin-bottom:10px}
+.weather-loading{text-align:center;padding:20px;color:#888;font-size:13px}
+.weather-error{text-align:center;padding:16px;color:#A32D2D;font-size:13px;background:#FCEBEB;border-radius:10px}
+.weather-main{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.weather-left{display:flex;align-items:center;gap:12px}
+.weather-icon{font-size:36px;line-height:1}
+.weather-temp{font-size:32px;font-weight:700;color:#1a1a1a;line-height:1}
+.weather-desc{font-size:13px;color:#666;margin-top:2px}
+.weather-detail{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.wd-item{background:#f5f5f0;border:1px solid #e8e8e0;border-radius:8px;padding:8px;text-align:center}
+.wd-label{font-size:10px;color:#888;margin-bottom:3px}
+.wd-val{font-size:14px;font-weight:600;color:#1a1a1a}
+.weather-forecast{margin-top:10px;padding-top:10px;border-top:1px solid #ebebeb}
+.wf-title{font-size:11px;color:#999;margin-bottom:8px;font-weight:600;letter-spacing:0.4px}
+.wf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.wf-item{background:#f9f9f6;border:1px solid #e8e8e0;border-radius:8px;padding:7px 4px;text-align:center}
+.wf-time{font-size:10px;color:#888;margin-bottom:3px}
+.wf-icon{font-size:18px;margin-bottom:2px}
+.wf-temp{font-size:12px;font-weight:600;color:#1a1a1a}
+.wf-rain{font-size:10px;color:#378ADD;margin-top:1px}
+.gps-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;border-radius:10px;background:#f0f8ff;border:1px solid #B5D4F4;color:#0C447C;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px}
+.gps-btn:active{background:#E6F1FB}
+.gps-info{font-size:12px;color:#555;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.6}
+
+/* hole-by-hole input */
+.hole-entry{background:#fff;border:1px solid #d8d8d0;border-radius:14px;margin-bottom:8px;overflow:hidden}
+.hole-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f9f9f6;border-bottom:1px solid #ebebeb;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.hole-num-badge{width:28px;height:28px;border-radius:50%;background:#1D9E75;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hole-summary{flex:1;margin-left:10px}
+.hole-summary-main{font-size:14px;font-weight:600;color:#1a1a1a}
+.hole-summary-sub{font-size:11px;color:#888;margin-top:1px}
+.hole-chevron{font-size:12px;color:#aaa;transition:transform 0.2s}
+.hole-chevron.open{transform:rotate(180deg)}
+.hole-score-badge{font-size:11px;padding:2px 8px;border-radius:5px;font-weight:600;border:1px solid transparent;margin-right:8px}
+.hole-body{display:none;padding:12px 14px;border-top:1px solid #ebebeb}
+.hole-body.open{display:block}
+.hole-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.hf{display:flex;flex-direction:column;gap:4px}
+.hf label{font-size:11px;color:#888;font-weight:500}
+.hf input{font-size:16px;font-weight:600;text-align:center;padding:9px 4px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a;width:100%;-webkit-appearance:none}
+.hf input:focus{outline:none;border-color:#1D9E75;box-shadow:0 0 0 2px rgba(29,158,117,0.12)}
+.hf input.filled{background:#e8f5f0;border-color:#9FE1CB;color:#085041}
+.hole-save-btn{width:100%;padding:9px;border-radius:8px;background:#1D9E75;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer}
+.hole-save-btn:active{background:#0F6E56}
+.hole-saved-mark{display:none;text-align:center;font-size:12px;color:#0F6E56;padding:4px 0;font-weight:600}
+/* par selector */
+.hpar-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.hpar-label{font-size:11px;color:#888;font-weight:500;white-space:nowrap}
+.hpar-btns{display:flex;gap:4px}
+.hpar-btn{padding:6px 14px;border-radius:7px;border:1px solid #d8d8d0;background:#f9f9f6;font-size:13px;font-weight:600;color:#555;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all 0.1s}
+.hpar-btn.hpar-active{background:#1D9E75;border-color:#1D9E75;color:#fff}
+/* comment */
+.comment-btn{width:28px;height:28px;border-radius:50%;border:1px solid #d8d8d0;background:#f9f9f6;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:4px;-webkit-tap-highlight-color:transparent}
+.comment-btn.has-comment{background:#FFF8E6;border-color:#FAC775;color:#854F0B}
+.comment-area{margin-bottom:10px;display:none}
+.comment-area.open{display:block}
+.comment-area textarea{width:100%;padding:9px 10px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;font-size:13px;color:#1a1a1a;resize:none;font-family:inherit;line-height:1.5}
+.comment-area textarea:focus{outline:none;border-color:#1D9E75;box-shadow:0 0 0 2px rgba(29,158,117,0.12)}
+.rc-comment{font-size:12px;color:#555;margin-top:6px;padding:7px 10px;background:#FFFBF0;border:1px solid #FAE9B0;border-radius:7px;line-height:1.5}
+
+/* voice input */
+.voice-row{display:flex;gap:6px;margin-bottom:10px;align-items:center}
+.voice-btn{display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 12px;border-radius:8px;background:#f0f8ff;border:1px solid #B5D4F4;color:#0C447C;font-size:12px;font-weight:600;cursor:pointer;flex:1;-webkit-tap-highlight-color:transparent;transition:all 0.15s}
+.voice-btn.listening{background:#FCEBEB;border-color:#F7C1C1;color:#A32D2D}
+.voice-btn.listening .mic-icon{animation:pulse 0.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+.voice-result{font-size:12px;color:#555;background:#f9f9f6;border:1px solid #e8e8e0;border-radius:7px;padding:6px 10px;min-height:32px;display:flex;align-items:center;flex:2}
+.voice-hint{font-size:11px;color:#aaa;margin-bottom:8px;text-align:center}
+
+/* totals bar */
+.totals-bar{background:#e8f5f0;border:1px solid #9FE1CB;border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.totals-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.tot-item{}
+.tot-label{font-size:10px;color:#0F6E56;font-weight:500;margin-bottom:2px}
+.tot-val{font-size:22px;font-weight:700;color:#085041;line-height:1}
+.tot-diff{font-size:11px;color:#0F6E56;margin-top:1px}
+
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field:last-child{margin-bottom:0}
+.field label{font-size:12px;color:#555;font-weight:500}
+.field input[type="date"]{font-size:15px;padding:11px 12px;border-radius:10px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a;width:100%;-webkit-appearance:none;appearance:none}
+.field input[type="date"]:focus{outline:none;border-color:#1D9E75;box-shadow:0 0 0 3px rgba(29,158,117,0.12)}
+.field input,.field select{font-size:15px;padding:11px 12px;border-radius:10px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a;width:100%;-webkit-appearance:none;appearance:none}
+.field input:focus,.field select:focus{outline:none;border-color:#1D9E75;box-shadow:0 0 0 3px rgba(29,158,117,0.12)}
+.row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
+
+.btn-ghost{background:#f5f5f0;border:1px solid #d8d8d0;border-radius:10px;padding:12px;font-size:14px;color:#555;cursor:pointer;width:100%;font-weight:500}
+.btn-ghost:active{background:#e8e8e0}
+.btn-save-all{background:#1D9E75;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;width:100%}
+.btn-save-all:active{background:#0F6E56}
+
+/* list */
+.rc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.rc-course{font-size:16px;font-weight:600;color:#1a1a1a}
+.rc-meta{font-size:12px;color:#888;margin-top:3px}
+.rc-score{font-size:30px;font-weight:700;color:#1a1a1a;line-height:1}
+.rc-diff{font-size:12px;margin-top:3px;text-align:right;font-weight:600}
+.rc-weather{display:flex;align-items:center;gap:4px;font-size:12px;color:#555;margin-top:4px}
+.rc-putts{font-size:12px;color:#555;margin-top:4px}
+.badges{display:flex;gap:3px;flex-wrap:wrap;padding-top:8px;border-top:1px solid #f0f0eb}
+.badge{font-size:11px;padding:3px 6px;border-radius:5px;font-weight:600;border:1px solid transparent;display:inline-block;white-space:nowrap}
+/* 記録一覧の数字バッジは固定幅 */
+.badges .badge{width:24px;text-align:center;padding:3px 0}
+/* 詳細モーダルのラベルバッジは幅自動 */
+.detail-badge{font-size:11px;padding:3px 8px;border-radius:5px;font-weight:600;border:1px solid transparent;display:inline-block;white-space:nowrap}
+.b-eagle{background:#E6F1FB;color:#0C447C;border-color:#B5D4F4}
+.b-birdie{background:#EAF3DE;color:#27500A;border-color:#C0DD97}
+.b-par{background:#F1EFE8;color:#444;border-color:#D3D1C7}
+.b-bogey{background:#FAEEDA;color:#633806;border-color:#FAC775}
+.b-dbl{background:#FCEBEB;color:#791F1F;border-color:#F7C1C1}
+.rc-actions{display:flex;gap:6px;padding-top:10px;border-top:1px solid #f0f0eb;margin-top:8px}
+.btn-detail{flex:1;padding:8px;border-radius:8px;background:#EAF3DE;border:1px solid #C0DD97;font-size:12px;color:#27500A;cursor:pointer;font-weight:500}
+.btn-edit{padding:8px 14px;border-radius:8px;background:#f5f5f0;border:1px solid #d8d8d0;font-size:12px;color:#555;cursor:pointer;font-weight:500}
+.btn-delete{padding:8px 14px;border-radius:8px;background:#FCEBEB;border:1px solid #F7C1C1;font-size:12px;color:#A32D2D;cursor:pointer;font-weight:500}
+
+/* edit modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:100;align-items:flex-end;justify-content:center}
+.modal-overlay.on{display:flex}
+.modal{background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 40px;width:100%;max-width:430px;max-height:90vh;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-ms-overflow-style:none}
+.modal::-webkit-scrollbar{display:none}
+#em-scroll::-webkit-scrollbar{display:none}
+/* media attachments */
+.media-btn{display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;font-size:11px;color:#555;cursor:pointer;font-weight:500;-webkit-tap-highlight-color:transparent}
+.media-btn:active{background:#e8e8e0}
+.media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.media-thumb{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;border:1px solid #e8e8e0;background:#f5f5f0;cursor:pointer}
+.media-thumb img,.media-thumb video{width:100%;height:100%;object-fit:cover;display:block}
+.media-thumb .del-media{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;line-height:1}
+.media-thumb .media-type-badge{position:absolute;bottom:3px;left:3px;background:rgba(0,0,0,0.5);color:#fff;font-size:9px;padding:1px 5px;border-radius:4px}
+/* media viewer */
+.media-viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:200;align-items:center;justify-content:center;flex-direction:column}
+.media-viewer.on{display:flex}
+.media-viewer img,.media-viewer video{max-width:95vw;max-height:80vh;border-radius:10px;object-fit:contain}
+.media-viewer-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #ebebeb;display:flex;justify-content:space-between;align-items:center}
+.modal-close{font-size:20px;color:#aaa;cursor:pointer;padding:0 4px}
+/* detail modal */
+.detail-hole-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0eb}
+.detail-hole-row:last-child{border-bottom:none}
+.detail-hole-num{width:28px;height:28px;border-radius:50%;background:#1D9E75;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.detail-hole-num.no-data{background:#e0e0d8;color:#aaa}
+.detail-hole-body{flex:1}
+.detail-hole-scores{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:3px}
+.detail-score-val{font-size:15px;font-weight:700;color:#1a1a1a}
+.detail-score-meta{font-size:12px;color:#888}
+.detail-hole-comment{font-size:12px;color:#555;margin-top:4px;padding:5px 8px;background:#FFFBF0;border:1px solid #FAE9B0;border-radius:6px;line-height:1.5}
+.detail-summary-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #ebebeb}
+.dsb-item{text-align:center;background:#f5f5f0;border:1px solid #e8e8e0;border-radius:8px;padding:8px}
+.dsb-label{font-size:10px;color:#888;margin-bottom:2px}
+.dsb-val{font-size:18px;font-weight:700;color:#1a1a1a}
+
+/* stats */
+.stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.sh{background:#fff;border:1px solid #d8d8d0;border-radius:12px;padding:14px;text-align:center}
+.sh-lbl{font-size:11px;color:#888;margin-bottom:4px;font-weight:500}
+.sh-val{font-size:24px;font-weight:700;color:#1a1a1a}
+.chart-wrap{background:#fff;border:1px solid #d8d8d0;border-radius:14px;padding:14px;margin-bottom:10px}
+.chart-lbl{font-size:12px;font-weight:600;color:#555;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ebebeb}
+.empty{text-align:center;padding:40px 16px}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty-title{font-size:15px;font-weight:600;color:#555;margin-bottom:6px}
+.empty-sub{font-size:13px;color:#888;margin-bottom:20px}
+.dplus{color:#A32D2D}.dminus{color:#0F6E56}.deven{color:#888}
+.spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* confirm dialog */
+.confirm-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center}
+.confirm-overlay.on{display:flex}
+.confirm-box{background:#fff;border-radius:16px;padding:24px 20px;width:280px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.18)}
+.confirm-msg{font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:6px}
+.confirm-sub{font-size:13px;color:#888;margin-bottom:20px}
+.confirm-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.confirm-cancel{padding:11px;border-radius:10px;background:#f5f5f0;border:1px solid #d8d8d0;font-size:14px;color:#555;cursor:pointer;font-weight:500}
+.confirm-ok{padding:11px;border-radius:10px;background:#FCEBEB;border:1px solid #F7C1C1;font-size:14px;color:#A32D2D;cursor:pointer;font-weight:600}
+/* search bar */
+.search-bar{display:flex;gap:8px;margin-bottom:10px;align-items:center}
+.search-input{flex:1;font-size:14px;padding:9px 12px;border-radius:10px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a}
+.search-input:focus{outline:none;border-color:#1D9E75;box-shadow:0 0 0 2px rgba(29,158,117,0.12)}
+.search-clear{font-size:18px;color:#aaa;cursor:pointer;padding:4px;background:none;border:none;line-height:1}
+/* data buttons */
+.data-btns{display:flex;gap:6px;margin-bottom:10px}
+.btn-data{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:9px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #d8d8d0;background:#f9f9f6;color:#555}
+.btn-data:active{background:#e8e8e0}
+.btn-data-import{border-color:#B5D4F4;background:#f0f8ff;color:#0C447C}
+/* onboarding banner */
+/* goal line */
+.goal-tag{font-size:9px;font-weight:600;fill:#E87C2B}
+.onboard-banner{background:#EAF3DE;border:1px solid #C0DD97;border-radius:12px;padding:12px 14px;margin-bottom:12px;position:relative}
+.onboard-title{font-size:13px;font-weight:600;color:#27500A;margin-bottom:4px}
+.onboard-body{font-size:12px;color:#3B6D11;line-height:1.6}
+.onboard-steps{margin-top:6px;padding-left:0;list-style:none}
+.onboard-steps li{font-size:12px;color:#3B6D11;padding:2px 0;display:flex;align-items:flex-start;gap:6px}
+.onboard-close{position:absolute;top:10px;right:12px;font-size:16px;color:#3B6D11;cursor:pointer;background:none;border:none;line-height:1}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">&#9971;</div>
+    <div><div class="logo-name">Golf Log</div><div class="logo-sub">スコア記録</div></div>
+  </div>
+  <button class="btn-add" onclick="startNewRound()">＋ 新規</button>
+</div>
+
+<div class="nav" style="grid-template-columns:repeat(4,1fr)">
+  <button class="nb on" onclick="go('list')">
+    <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    記録
+  </button>
+  <button class="nb" onclick="go('input')">
+    <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    入力
+  </button>
+  <button class="nb" onclick="go('stats')">
+    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    統計
+  </button>
+  <button class="nb" onclick="go('data')">
+    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    データ
+  </button>
+</div>
+
+<!-- 記録一覧 -->
+<div id="s-list" class="sec on">
+  <div id="onboard-banner" class="onboard-banner" style="display:none">
+    <div class="onboard-title">🏌️ Golf Log へようこそ！</div>
+    <div class="onboard-body">ホーム画面に追加するとアプリのように使えます</div>
+    <ul class="onboard-steps">
+      <li><span>Android</span>ブラウザのメニュー →「ホーム画面に追加」</li>
+      <li><span>iPhone</span>Safari の共有ボタン →「ホーム画面に追加」</li>
+    </ul>
+    <button class="onboard-close" onclick="closeOnboard()">✕</button>
+  </div>
+  <div class="search-bar">
+    <input type="text" class="search-input" id="search-input" placeholder="🔍 コース名・ラウンド名で検索..." oninput="renderList()">
+    <button class="search-clear" onclick="clearSearch()" title="クリア">✕</button>
+  </div>
+  <div id="list-body"></div>
+</div>
+
+<!-- 入力 -->
+<div id="s-input" class="sec">
+  <!-- GPS天気 -->
+  <div class="weather-card">
+    <div class="card-title" style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ebebeb;font-size:11px;font-weight:600;color:#999;letter-spacing:0.6px;text-transform:uppercase">現在地の天気</div>
+    <button class="gps-btn" id="gps-btn" onclick="fetchGpsWeather()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      GPS で現在地の天気を取得
+    </button>
+    <div id="weather-body"><div style="text-align:center;padding:8px;font-size:13px;color:#aaa">ボタンを押すと現在地の天気を取得します</div></div>
+    <div id="gps-info-box"></div>
+  </div>
+
+  <!-- ラウンド情報 -->
+  <div class="card">
+    <div class="card-title">ラウンド情報</div>
+    <div class="field"><label>ラウンド名</label><input type="text" id="f-round" placeholder="例：仲間内コンペ、練習ラウンド"></div>
+    <div class="field"><label>コース名</label><input type="text" id="f-course" placeholder="例：○○ゴルフクラブ"></div>
+    <div class="row2">
+      <div class="field"><label>プレー日</label><input type="date" id="f-date"></div>
+      <div class="field"><label>コースパー</label>
+        <input type="number" inputmode="numeric" id="f-par" value="72" min="60" max="80" placeholder="72">
+      </div>
+    </div>
+  </div>
+
+  <!-- 合計バー -->
+  <div class="totals-bar" id="totals-bar">
+    <div class="totals-row">
+      <div class="tot-item"><div class="tot-label">入力済</div><div class="tot-val" id="tot-filled">0</div><div class="tot-diff">/ 18H</div></div>
+      <div class="tot-item"><div class="tot-label">合計打数</div><div class="tot-val" id="tot-score">—</div><div class="tot-diff" id="tot-diff"></div></div>
+      <div class="tot-item"><div class="tot-label">合計パット</div><div class="tot-val" id="tot-putts">—</div></div>
+    </div>
+  </div>
+
+  <!-- ホール別入力 -->
+  <div id="holes-container"></div>
+
+  <!-- 保存・クリア -->
+  <div class="row2" style="margin-top:4px">
+    <button class="btn-ghost" onclick="clearForm()">クリア</button>
+    <button class="btn-save-all" onclick="saveAll()">ラウンドを保存</button>
+  </div>
+</div>
+
+<!-- 統計 -->
+<div id="s-stats" class="sec">
+  <div class="stats-grid" id="sg"></div>
+  <div id="ca"></div>
+</div>
+
+<!-- データ管理 -->
+<div id="s-data" class="sec">
+  <div class="card">
+    <div class="card-title">目標スコア設定</div>
+    <p style="font-size:13px;color:#555;margin-bottom:12px;line-height:1.6">目標スコアを設定すると統計グラフに目標ラインが表示されます。</p>
+    <div style="display:flex;gap:10px;align-items:flex-end">
+      <div class="field" style="flex:1;margin-bottom:0">
+        <label>目標スコア（18H）</label>
+        <input type="number" inputmode="numeric" id="goal-score" min="60" max="130" placeholder="例：90" oninput="saveGoal()">
+      </div>
+      <div style="padding-bottom:2px;font-size:13px;color:#888">打</div>
+    </div>
+    <div id="goal-msg" style="margin-top:8px;font-size:12px;color:#0F6E56;min-height:18px"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">データのバックアップ</div>
+    <p style="font-size:13px;color:#555;margin-bottom:12px;line-height:1.6">記録をJSONファイルに書き出して保存できます。機種変更やブラウザのデータ消去に備えて定期的にバックアップしてください。</p>
+    <button class="btn-save-all" onclick="exportData()" style="margin-bottom:8px">
+      <span style="margin-right:5px">📤</span>データをエクスポート
+    </button>
+  </div>
+  <div class="card">
+    <div class="card-title">データの読み込み</div>
+    <p style="font-size:13px;color:#555;margin-bottom:12px;line-height:1.6">バックアップしたJSONファイルを読み込みます。<span style="color:#A32D2D;font-weight:600">現在の記録に追加</span>されます（上書きではありません）。</p>
+    <button class="btn-data btn-data-import" onclick="document.getElementById('import-file').click()" style="width:100%;padding:11px;font-size:14px">
+      <span>📥</span>JSONファイルを読み込む
+    </button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+    <div id="import-result" style="margin-top:8px;font-size:12px;text-align:center"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">CSVエクスポート</div>
+    <p style="font-size:13px;color:#555;margin-bottom:12px;line-height:1.6">スコア一覧をCSV形式で書き出します。Excelやスプレッドシートで開けます。</p>
+    <button class="btn-ghost" onclick="exportCSV()" style="width:100%">
+      <span style="margin-right:5px">📊</span>CSVでエクスポート
+    </button>
+  </div>
+  <div class="card" style="border-color:#F7C1C1">
+    <div class="card-title" style="color:#A32D2D">全データ削除</div>
+    <p style="font-size:13px;color:#555;margin-bottom:12px;line-height:1.6">保存されている全記録を削除します。この操作は元に戻せません。</p>
+    <button class="btn-ghost" onclick="deleteAllRecords()" style="width:100%;color:#A32D2D;border-color:#F7C1C1;background:#FCEBEB">
+      🗑 全データを削除する
+    </button>
+  </div>
+</div>
+
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal" style="padding:0;display:flex;flex-direction:column;max-height:90vh;border-radius:20px 20px 0 0;overflow:hidden">
+    <div style="padding:20px 16px 12px;border-bottom:1px solid #ebebeb;flex-shrink:0">
+      <div class="modal-title" style="margin-bottom:0">記録を編集 <span class="modal-close" onclick="closeModal()">✕</span></div>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:16px 16px 0;scrollbar-width:none;-ms-overflow-style:none" id="em-scroll">
+      <div class="field"><label>ラウンド名</label><input type="text" id="em-round" placeholder="例：仲間内コンペ"></div>
+      <div class="field"><label>コース名</label><input type="text" id="em-course"></div>
+      <div class="row2">
+        <div class="field"><label>プレー日</label><input type="date" id="em-date"></div>
+        <div class="field"><label>コースパー</label><input type="number" inputmode="numeric" id="em-par" min="60" max="80" placeholder="72"></div>
+      </div>
+      <div id="em-holes"></div>
+    </div>
+    <div style="padding:12px 16px 32px;border-top:1px solid #ebebeb;display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-shrink:0;background:#fff">
+      <button class="btn-ghost" onclick="closeModal()">キャンセル</button>
+      <button class="btn-save-all" onclick="saveEdit()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 詳細モーダル -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal">
+    <div class="modal-title"><span id="dm-title">ラウンド詳細</span><span class="modal-close" onclick="closeDetailModal()">✕</span></div>
+    <div id="dm-meta" style="font-size:12px;color:#888;margin-bottom:12px"></div>
+    <div class="detail-summary-bar" id="dm-summary"></div>
+    <div id="dm-holes"></div>
+  </div>
+</div>
+
+<!-- 削除確認ダイアログ -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-msg">記録を削除しますか？</div>
+    <div class="confirm-sub">この操作は元に戻せません</div>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="closeConfirm()">キャンセル</button>
+      <button class="confirm-ok" id="confirm-ok-btn">削除する</button>
+    </div>
+  </div>
+</div>
+
+<!-- メディアビューア -->
+<div class="media-viewer" id="media-viewer" onclick="closeMediaViewer()">
+  <button class="media-viewer-close" onclick="closeMediaViewer()">✕</button>
+  <div id="media-viewer-content"></div>
+</div>
+
+<script>
+var records = JSON.parse(localStorage.getItem('golflog_v2') || '[]');
+var lastWeather = null, lastGps = null;
+var editingId = null;
+var currentHoleData = [];
+
+function persist(){ localStorage.setItem('golflog_v2', JSON.stringify(records)); }
+function fmtDate(){ var d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0'); }
+function dispDate(s){ return s?s.replace(/-/g,'/'):''; }
+
+// ---- Weather ----
+function wmoInfo(c){ if(c===0)return{icon:'☀️',label:'快晴'}; if(c<=2)return{icon:'⛅',label:'晴れ時々曇り'}; if(c===3)return{icon:'☁️',label:'曇り'}; if(c<=49)return{icon:'🌫️',label:'霧'}; if(c<=59)return{icon:'🌦️',label:'霧雨'}; if(c<=69)return{icon:'🌧️',label:'雨'}; if(c<=79)return{icon:'❄️',label:'雪'}; if(c<=82)return{icon:'🌧️',label:'にわか雨'}; if(c<=86)return{icon:'🌨️',label:'にわか雪'}; return{icon:'⛈️',label:'雷雨'}; }
+function windDir(deg){ var d=['北','北北東','北東','東北東','東','東南東','南東','南南東','南','南南西','南西','西南西','西','西北西','北西','北北西']; return d[Math.round(deg/22.5)%16]; }
+
+function fetchGpsWeather(){
+  var btn=document.getElementById('gps-btn');
+  var body=document.getElementById('weather-body');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spin">↻</span> 位置情報を取得中...';
+  body.innerHTML='<div class="weather-loading"><span class="spin">↻</span> 取得中...</div>';
+  if(!navigator.geolocation){ showWeatherError('GPS非対応の端末です'); btn.disabled=false; return; }
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var lat=pos.coords.latitude.toFixed(4), lon=pos.coords.longitude.toFixed(4);
+    lastGps={lat:lat,lon:lon,acc:Math.round(pos.coords.accuracy)};
+    document.getElementById('gps-info-box').innerHTML='<div class="gps-info">📍 緯度'+lat+' / 経度'+lon+' （精度±'+lastGps.acc+'m）</div>';
+    btn.innerHTML='<span class="spin">↻</span> 天気を取得中...';
+    var url='https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,weather_code&hourly=temperature_2m,precipitation_probability,weather_code&timezone=Asia%2FTokyo&forecast_days=1';
+    fetch(url).then(function(r){return r.json();}).then(function(data){
+      lastWeather=data; renderWeather(data);
+      btn.disabled=false; btn.innerHTML='🔄 更新';
+    }).catch(function(){ showWeatherError('天気取得に失敗しました'); btn.disabled=false; btn.innerHTML='📍 もう一度試す'; });
+  },function(err){
+    var m=err.code===1?'位置情報へのアクセスが拒否されました':err.code===2?'位置情報を取得できませんでした':'タイムアウトしました';
+    showWeatherError(m); btn.disabled=false; btn.innerHTML='📍 GPS で現在地の天気を取得';
+  },{timeout:10000,enableHighAccuracy:true});
+}
+function showWeatherError(msg){ document.getElementById('weather-body').innerHTML='<div class="weather-error">⚠️ '+msg+'</div>'; }
+function renderWeather(data){
+  var c=data.current, wi=wmoInfo(c.weather_code);
+  var temp=Math.round(c.temperature_2m), feels=Math.round(c.apparent_temperature);
+  var humid=Math.round(c.relative_humidity_2m), wind=Math.round(c.wind_speed_10m);
+  var wdir=windDir(c.wind_direction_10m), rain=c.precipitation.toFixed(1);
+  var nowH=new Date().getHours(), times=data.hourly.time, si=0;
+  for(var i=0;i<times.length;i++){if(parseInt(times[i].split('T')[1])>=nowH){si=i;break;}}
+  var fcHtml=''; for(var j=si;j<Math.min(si+4,times.length);j++){
+    var fw=wmoInfo(data.hourly.weather_code[j]);
+    fcHtml+='<div class="wf-item"><div class="wf-time">'+times[j].split('T')[1].substring(0,5)+'</div><div class="wf-icon">'+fw.icon+'</div><div class="wf-temp">'+Math.round(data.hourly.temperature_2m[j])+'°</div><div class="wf-rain">💧'+data.hourly.precipitation_probability[j]+'%</div></div>';
+  }
+  document.getElementById('weather-body').innerHTML=
+    '<div class="weather-main"><div class="weather-left"><div class="weather-icon">'+wi.icon+'</div><div><div class="weather-temp">'+temp+'°C</div><div class="weather-desc">'+wi.label+'</div></div></div><div style="text-align:right"><div style="font-size:12px;color:#555">体感 <b>'+feels+'°C</b></div><div style="font-size:12px;color:#555">降水 <b>'+rain+'mm</b></div></div></div>'+
+    '<div class="weather-detail"><div class="wd-item"><div class="wd-label">湿度</div><div class="wd-val">'+humid+'%</div></div><div class="wd-item"><div class="wd-label">風速</div><div class="wd-val">'+wind+'m/s</div></div><div class="wd-item"><div class="wd-label">風向</div><div class="wd-val">'+wdir+'</div></div></div>'+
+    '<div class="weather-forecast"><div class="wf-title">時間別予報</div><div class="wf-grid">'+fcHtml+'</div></div>';
+}
+
+// ---- Hole data helpers ----
+function initHoleData(){
+  currentHoleData=[];
+  for(var i=1;i<=18;i++) currentHoleData.push({hole:i,par:4,score:null,putts:null,comment:'',media:[],saved:false});
+}
+function getHolePar(holeNum){
+  return currentHoleData[holeNum-1] ? currentHoleData[holeNum-1].par : 4;
+}
+function setHolePar(n, p){
+  currentHoleData[n-1].par = p;
+  // ボタンのアクティブ状態を更新
+  [3,4,5].forEach(function(v){
+    var btn = document.getElementById('hpar-'+n+'-'+v);
+    if(btn) btn.classList.toggle('hpar-active', v===p);
+  });
+  // ヘッダーのサブテキスト更新（保存済みの場合）
+  if(currentHoleData[n-1].saved){
+    var s = currentHoleData[n-1].score;
+    var d = s - p;
+    var bl = badgeLabel(d);
+    var bc = badgeCls(d);
+    document.getElementById('hole-summ-sub-'+n).textContent = bl+(currentHoleData[n-1].ob?' / OB '+currentHoleData[n-1].ob:'');
+    var sbadge = document.getElementById('hole-sbadge-'+n);
+    sbadge.className = 'hole-score-badge '+bc;
+    sbadge.textContent = s;
+  }
+  // コースパー合計を自動更新
+  var total = currentHoleData.reduce(function(a,h){return a+h.par;},0);
+  document.getElementById('f-par').value = total;
+  updateTotals();
+}
+function scoreDiff(score, par){ return score-par; }
+function badgeCls(d){ if(d<=-3)return'b-eagle'; if(d===-2)return'b-eagle'; if(d===-1)return'b-birdie'; if(d===0)return'b-par'; if(d===1)return'b-bogey'; return'b-dbl'; }
+function badgeLabel(d){ if(d<=-3)return'Albatross'; if(d===-2)return'Eagle'; if(d===-1)return'Birdie'; if(d===0)return'Par'; if(d===1)return'Bogey'; if(d===2)return'Dbl Bogey'; if(d===3)return'Tri Bogey'; if(d===4)return'+4'; if(d===5)return'+5'; return'+'+d; }
+
+// ---- Build hole UI ----
+function buildHoles(){
+  var container=document.getElementById('holes-container');
+  container.innerHTML='';
+  for(var i=1;i<=18;i++){
+    (function(n){
+      var div=document.createElement('div');
+      div.className='hole-entry';
+      div.id='hole-entry-'+n;
+      var half=n<=9?'前半':'後半';
+      div.innerHTML=
+        '<div class="hole-header" onclick="toggleHole('+n+')" id="hole-hdr-'+n+'">'+
+          '<div class="hole-num-badge">'+n+'</div>'+
+          '<div class="hole-summary">'+
+            '<div class="hole-summary-main" id="hole-summ-main-'+n+'">'+half+' '+n+'ホール目</div>'+
+            '<div class="hole-summary-sub" id="hole-summ-sub-'+n+'">タップして入力</div>'+
+          '</div>'+
+          '<button class="comment-btn" id="hcmt-btn-'+n+'" onclick="toggleComment(event,'+n+')" title="コメント">💬</button>'+
+          '<span class="hole-score-badge" id="hole-sbadge-'+n+'" style="display:none"></span>'+
+          '<span class="hole-chevron" id="hole-chev-'+n+'">▼</span>'+
+        '</div>'+
+        '<div class="hole-body" id="hole-body-'+n+'">'+
+          '<div class="hpar-row">'+
+            '<span class="hpar-label">このホールのパー</span>'+
+            '<div class="hpar-btns">'+
+              '<button class="hpar-btn" id="hpar-'+n+'-3" onclick="setHolePar('+n+',3)">Par 3</button>'+
+              '<button class="hpar-btn hpar-active" id="hpar-'+n+'-4" onclick="setHolePar('+n+',4)">Par 4</button>'+
+              '<button class="hpar-btn" id="hpar-'+n+'-5" onclick="setHolePar('+n+',5)">Par 5</button>'+
+            '</div>'+
+          '</div>'+
+          '<div class="voice-hint">例：「パー4 5打2パット」「5打2パット1OB」</div>'+
+          '<div class="voice-row">'+
+            '<button class="voice-btn" id="vbtn-'+n+'" onclick="startVoice('+n+')">'+
+              '<svg class="mic-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'+
+              '音声入力'+
+            '</button>'+
+            '<div class="voice-result" id="vresult-'+n+'">認識結果がここに表示されます</div>'+
+          '</div>'+
+          '<div class="hole-fields">'+
+            '<div class="hf"><label>打数</label><input type="number" inputmode="numeric" min="1" max="15" id="hs-'+n+'" placeholder="—" oninput="onHoleChange('+n+')"></div>'+
+            '<div class="hf"><label>パット数</label><input type="number" inputmode="numeric" min="0" max="10" id="hp-'+n+'" placeholder="—" oninput="onHoleChange('+n+')"></div>'+
+            '<div class="hf"><label>OB / ペナ</label><input type="number" inputmode="numeric" min="0" max="10" id="hob-'+n+'" placeholder="0" oninput="onHoleChange('+n+')"></div>'+
+          '</div>'+
+          '<div class="comment-area" id="hcmt-area-'+n+'">'+
+            '<div style="display:flex;gap:6px;margin-bottom:5px;align-items:center;flex-wrap:wrap">'+
+              '<label style="font-size:11px;color:#888;font-weight:500;white-space:nowrap">メモ</label>'+
+              '<button class="voice-btn" id="cvbtn-'+n+'" onclick="startCommentVoice('+n+')" style="flex:none;padding:6px 10px;font-size:11px;gap:4px">'+
+                '<svg class="mic-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'+
+                '音声でメモ'+
+              '</button>'+
+              '<button class="media-btn" onclick="triggerMediaPicker('+n+')">📎 写真・動画</button>'+
+              '<input type="file" id="media-input-'+n+'" accept="image/*,video/*" style="display:none" onchange="onMediaSelected('+n+',this)">'+
+            '</div>'+
+            '<textarea id="hcmt-'+n+'" rows="2" placeholder="メモを入力..." oninput="onCommentChange('+n+')"></textarea>'+
+            '<div class="media-grid" id="media-grid-'+n+'"></div>'+
+          '</div>'+
+          '<button class="hole-save-btn" onclick="saveHole('+n+')">このホールを保存</button>'+
+          '<div class="hole-saved-mark" id="hole-saved-'+n+'">✓ 保存済み</div>'+
+        '</div>';
+      container.appendChild(div);
+    })(i);
+  }
+}
+
+function toggleHole(n){
+  var body=document.getElementById('hole-body-'+n);
+  var chev=document.getElementById('hole-chev-'+n);
+  var isOpen=body.classList.contains('open');
+  body.classList.toggle('open',!isOpen);
+  chev.classList.toggle('open',!isOpen);
+}
+
+function toggleComment(event, n){
+  event.stopPropagation(); // ホール開閉を防ぐ
+  var area=document.getElementById('hcmt-area-'+n);
+  var body=document.getElementById('hole-body-'+n);
+  var isAreaOpen=area.classList.contains('open');
+  if(!isAreaOpen){
+    // コメントエリアを開きつつホールも開く
+    area.classList.add('open');
+    if(!body.classList.contains('open')){
+      body.classList.add('open');
+      document.getElementById('hole-chev-'+n).classList.add('open');
+    }
+    document.getElementById('hcmt-'+n).focus();
+  } else {
+    area.classList.remove('open');
+  }
+}
+
+function onCommentChange(n){
+  var val=document.getElementById('hcmt-'+n).value;
+  currentHoleData[n-1].comment=val;
+  var btn=document.getElementById('hcmt-btn-'+n);
+  btn.classList.toggle('has-comment', val.trim().length>0);
+}
+
+function onHoleChange(n){
+  var s=document.getElementById('hs-'+n).value;
+  var p=document.getElementById('hp-'+n).value;
+  if(s) document.getElementById('hs-'+n).classList.add('filled');
+  else document.getElementById('hs-'+n).classList.remove('filled');
+  if(p) document.getElementById('hp-'+n).classList.add('filled');
+  else document.getElementById('hp-'+n).classList.remove('filled');
+  currentHoleData[n-1].score = s ? parseInt(s) : null;
+  currentHoleData[n-1].putts = p ? parseInt(p) : null;
+  currentHoleData[n-1].ob = document.getElementById('hob-'+n).value ? parseInt(document.getElementById('hob-'+n).value) : 0;
+  updateTotals();
+}
+
+function saveHole(n){
+  var s=parseInt(document.getElementById('hs-'+n).value);
+  if(isNaN(s)){ alert('打数を入力してください'); return; }
+  currentHoleData[n-1].score=s;
+  currentHoleData[n-1].putts=parseInt(document.getElementById('hp-'+n).value)||null;
+  currentHoleData[n-1].ob=parseInt(document.getElementById('hob-'+n).value)||0;
+  currentHoleData[n-1].comment=document.getElementById('hcmt-'+n).value.trim();
+  currentHoleData[n-1].media=currentHoleData[n-1].media||[];
+  currentHoleData[n-1].saved=true;
+  var hpar=getHolePar(n);
+  var d=s-hpar;
+  var bc=badgeCls(d), bl=badgeLabel(d);
+  var sbadge=document.getElementById('hole-sbadge-'+n);
+  sbadge.className='hole-score-badge '+bc;
+  sbadge.textContent=s;
+  sbadge.style.display='inline-block';
+  document.getElementById('hole-summ-main-'+n).textContent=n+'H — 打数 '+s+(currentHoleData[n-1].putts!==null?' / パット '+currentHoleData[n-1].putts+'':'');
+  document.getElementById('hole-summ-sub-'+n).textContent=bl+(currentHoleData[n-1].ob?' / OB '+currentHoleData[n-1].ob:'');
+  document.getElementById('hole-saved-'+n).style.display='block';
+  updateTotals();
+  var body=document.getElementById('hole-body-'+n);
+  var chev=document.getElementById('hole-chev-'+n);
+  body.classList.remove('open'); chev.classList.remove('open');
+  if(n<18){ setTimeout(function(){ toggleHole(n+1); },200); }
+}
+
+// ---- Voice Input ----
+var voiceRecognition = null;
+var activeVoiceHole = null;
+
+function startVoice(n){
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecognition){
+    alert('このブラウザは音声認識に対応していません。\nChrome（Android）をお使いください。');
+    return;
+  }
+  if(activeVoiceHole !== null){ stopVoice(); if(activeVoiceHole === n) return; }
+
+  var btn = document.getElementById('vbtn-'+n);
+  var result = document.getElementById('vresult-'+n);
+  btn.classList.add('listening');
+  btn.innerHTML='<svg class="mic-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>録音中...';
+  result.textContent = '話しかけてください...';
+  result.style.color = '#A32D2D';
+  activeVoiceHole = n;
+
+  voiceRecognition = new SpeechRecognition();
+  voiceRecognition.lang = 'ja-JP';
+  voiceRecognition.interimResults = true;
+  voiceRecognition.maxAlternatives = 3;
+
+  voiceRecognition.onresult = function(e){
+    var transcript = '';
+    for(var i=e.resultIndex; i<e.results.length; i++){
+      transcript += e.results[i][0].transcript;
+    }
+    result.textContent = '「' + transcript + '」';
+    result.style.color = '#555';
+    if(e.results[e.results.length-1].isFinal){
+      parseVoiceInput(transcript, n);
+      stopVoice();
+    }
+  };
+
+  voiceRecognition.onerror = function(e){
+    var msg = e.error === 'not-allowed' ? 'マイクへのアクセスを許可してください' :
+              e.error === 'no-speech'   ? '音声が検出されませんでした' : '認識に失敗しました（'+e.error+'）';
+    result.textContent = '⚠️ ' + msg;
+    result.style.color = '#A32D2D';
+    stopVoice();
+  };
+
+  voiceRecognition.onend = function(){ stopVoice(); };
+  voiceRecognition.start();
+}
+
+function stopVoice(){
+  if(voiceRecognition){ try{ voiceRecognition.stop(); }catch(e){} voiceRecognition=null; }
+  if(activeVoiceHole !== null){
+    var btn = document.getElementById('vbtn-'+activeVoiceHole);
+    if(btn){
+      btn.classList.remove('listening');
+      btn.innerHTML='<svg class="mic-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>音声入力';
+    }
+    activeVoiceHole = null;
+  }
+}
+
+// ---- Comment Voice Input ----
+var commentVoiceRec = null;
+var activeCommentHole = null;
+var cmtMicSVG = '<svg class="mic-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+
+function startCommentVoice(n){
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ alert('このブラウザは音声認識に対応していません。\nChrome（Android）をお使いください。'); return; }
+  // 別のコメント録音中なら止める
+  if(activeCommentHole !== null){ stopCommentVoice(); if(activeCommentHole === n) return; }
+  // スコア音声と排他
+  if(activeVoiceHole !== null) stopVoice();
+
+  var btn = document.getElementById('cvbtn-'+n);
+  btn.classList.add('listening');
+  btn.innerHTML = cmtMicSVG + '録音中...';
+  activeCommentHole = n;
+
+  commentVoiceRec = new SR();
+  commentVoiceRec.lang = 'ja-JP';
+  commentVoiceRec.interimResults = true;
+  commentVoiceRec.maxAlternatives = 1;
+
+  commentVoiceRec.onresult = function(e){
+    var interim = '';
+    for(var i = e.resultIndex; i < e.results.length; i++) interim += e.results[i][0].transcript;
+    var ta = document.getElementById('hcmt-'+n);
+    ta.value = interim;
+    if(e.results[e.results.length-1].isFinal){
+      ta.value = interim.trim();
+      currentHoleData[n-1].comment = ta.value;
+      document.getElementById('hcmt-btn-'+n).classList.toggle('has-comment', ta.value.length > 0);
+      stopCommentVoice();
+    }
+  };
+  commentVoiceRec.onerror = function(e){
+    var msg = e.error === 'not-allowed' ? 'マイクへのアクセスを許可してください' : '音声認識に失敗しました（'+e.error+'）';
+    var ta = document.getElementById('hcmt-'+n);
+    ta.placeholder = '⚠️ ' + msg;
+    stopCommentVoice();
+  };
+  commentVoiceRec.onend = function(){ stopCommentVoice(); };
+  commentVoiceRec.start();
+}
+
+function stopCommentVoice(){
+  if(commentVoiceRec){ try{ commentVoiceRec.stop(); }catch(e){} commentVoiceRec = null; }
+  if(activeCommentHole !== null){
+    var btn = document.getElementById('cvbtn-'+activeCommentHole);
+    if(btn){ btn.classList.remove('listening'); btn.innerHTML = cmtMicSVG + '音声でメモ'; }
+    activeCommentHole = null;
+  }
+}
+
+// ---- Media Attachments ----
+function triggerMediaPicker(n){
+  document.getElementById('media-input-'+n).click();
+}
+
+function onMediaSelected(n, input){
+  var files = input.files;
+  if(!files || !files.length) return;
+  var file = files[0];
+  // サイズチェック: 画像20MB / 動画50MB
+  var limitMB = file.type.startsWith('video') ? 50 : 20;
+  if(file.size > limitMB * 1024 * 1024){
+    alert(file.type.startsWith('video') ? '動画は50MB以下にしてください' : '画像は20MB以下にしてください');
+    input.value = ''; return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var item = { type: file.type.startsWith('video') ? 'video' : 'image', data: e.target.result, name: file.name };
+    if(!currentHoleData[n-1].media) currentHoleData[n-1].media = [];
+    currentHoleData[n-1].media.push(item);
+    renderMediaGrid(n);
+    // コメントボタンをオレンジに
+    document.getElementById('hcmt-btn-'+n).classList.add('has-comment');
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function renderMediaGrid(n){
+  var grid = document.getElementById('media-grid-'+n);
+  if(!grid) return;
+  var items = currentHoleData[n-1].media || [];
+  if(!items.length){ grid.innerHTML = ''; return; }
+  grid.innerHTML = items.map(function(item, idx){
+    var thumb = item.type === 'video'
+      ? '<video src="'+item.data+'" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><span class="media-type-badge">動画</span>'
+      : '<img src="'+item.data+'" alt="添付画像">';
+    return '<div class="media-thumb" onclick="openMediaViewer('+n+','+idx+')" style="aspect-ratio:1">'+
+      thumb+
+      '<button class="del-media" onclick="deleteMedia(event,'+n+','+idx+')">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+function deleteMedia(event, n, idx){
+  event.stopPropagation();
+  currentHoleData[n-1].media.splice(idx, 1);
+  renderMediaGrid(n);
+  // メディアもコメントもなければボタン色を戻す
+  var hasAny = currentHoleData[n-1].comment.trim().length > 0 || (currentHoleData[n-1].media && currentHoleData[n-1].media.length > 0);
+  document.getElementById('hcmt-btn-'+n).classList.toggle('has-comment', hasAny);
+}
+
+function openMediaViewer(n, idx){
+  var item = currentHoleData[n-1].media[idx];
+  var content = document.getElementById('media-viewer-content');
+  if(item.type === 'video'){
+    content.innerHTML = '<video src="'+item.data+'" controls autoplay style="max-width:95vw;max-height:80vh;border-radius:10px"></video>';
+  } else {
+    content.innerHTML = '<img src="'+item.data+'" style="max-width:95vw;max-height:80vh;border-radius:10px;object-fit:contain">';
+  }
+  document.getElementById('media-viewer').classList.add('on');
+}
+
+function closeMediaViewer(){
+  var v = document.getElementById('media-viewer');
+  v.classList.remove('on');
+  document.getElementById('media-viewer-content').innerHTML = '';
+}
+
+// 漢数字・数詞→数字変換
+var kanjiMap = {'零':0,'〇':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+function kanjiToNum(s){
+  s = s.replace(/[０-９]/g, function(c){ return String.fromCharCode(c.charCodeAt(0)-0xFEE0); });
+  if(/^\d+$/.test(s)) return parseInt(s);
+  if(kanjiMap[s] !== undefined) return kanjiMap[s];
+  if(s === '十') return 10;
+  var m = s.match(/^([一二三四五六七八九])?十([一二三四五六七八九])?$/);
+  if(m){ return (m[1]?kanjiMap[m[1]]:1)*10 + (m[2]?kanjiMap[m[2]]:0); }
+  return null;
+}
+
+function toggleEmPar(btn, n, p){
+  btn.closest('div').querySelectorAll('.hpar-btn').forEach(function(b){ b.classList.remove('hpar-active'); });
+  btn.classList.add('hpar-active');
+  document.getElementById('em-par-'+n).value = p;
+}
+
+function triggerEmMedia(n){
+  document.getElementById('em-media-input-'+n).click();
+}
+
+function onEmMediaSelected(n, input){
+  var files = input.files;
+  if(!files || !files.length) return;
+  var file = files[0];
+  var limitMB = file.type.startsWith('video') ? 50 : 20;
+  if(file.size > limitMB * 1024 * 1024){
+    alert((file.type.startsWith('video') ? '動画は50MB' : '画像は20MB') + '以下にしてください');
+    input.value = ''; return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    if(!window.emMedia) window.emMedia = {};
+    if(!window.emMedia[n]) window.emMedia[n] = [];
+    window.emMedia[n].push({ type: file.type.startsWith('video') ? 'video' : 'image', data: e.target.result, name: file.name });
+    renderEmMediaGrid(n);
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function renderEmMediaGrid(n){
+  var grid = document.getElementById('em-media-grid-'+n);
+  if(!grid) return;
+  var items = (window.emMedia && window.emMedia[n]) ? window.emMedia[n] : [];
+  if(!items.length){ grid.innerHTML = ''; return; }
+  grid.innerHTML = items.map(function(item, idx){
+    var thumb = item.type === 'video'
+      ? '<video src="'+item.data+'" muted playsinline style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e8e8e0"></video>'
+      : '<img src="'+item.data+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e8e8e0">';
+    return '<div style="position:relative;display:inline-block">'+
+      '<div onclick="openDetailMedia(\''+item.type+'\',\''+item.data+'\')">'+thumb+'</div>'+
+      '<button onclick="deleteEmMedia('+n+','+idx+')" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;font-size:10px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+function deleteEmMedia(n, idx){
+  if(window.emMedia && window.emMedia[n]) window.emMedia[n].splice(idx, 1);
+  renderEmMediaGrid(n);
+}
+
+function parseVoiceInput(text, n){
+  var result = document.getElementById('vresult-'+n);
+  // 数字・漢数字トークンで分割して数値を抽出
+  var numRe = /([零〇一二三四五六七八九十百]+|\d+)/g;
+  var nums = [];
+  var m;
+  while((m=numRe.exec(text))!==null){
+    var v = kanjiToNum(m[1]);
+    if(v!==null && v>=0) nums.push(v);
+  }
+
+  // キーワードで打数・パット・OBを特定
+  var score=null, putts=null, ob=null, holePar=null;
+
+  // パー認識「パー4」「パー3」「パー5」
+  var parMatch = text.match(/パ[ーア]?\s*([345三四五])/);
+  if(parMatch){
+    var pv = parMatch[1];
+    holePar = (pv==='三'||pv==='3')?3:(pv==='五'||pv==='5')?5:4;
+  }
+
+  // パターン1: キーワード付き「5打2パット1OB」
+  var scoreMatch  = text.match(/([零〇一二三四五六七八九十百]+|\d+)\s*[打だ打ダ]/);
+  var puttsMatch  = text.match(/([零〇一二三四五六七八九十百]+|\d+)\s*[パぱパット]/);
+  var obMatch     = text.match(/([零〇一二三四五六七八九十百]+|\d+)\s*[OoＯｏ][Bbｂ]/i) ||
+                    text.match(/([零〇一二三四五六七八九十百]+|\d+)\s*(OB|オービー|ペナ)/);
+
+  if(scoreMatch) score = kanjiToNum(scoreMatch[1]);
+  if(puttsMatch) putts = kanjiToNum(puttsMatch[1]);
+  if(obMatch)    ob    = kanjiToNum(obMatch[1]);
+
+  // パターン2: キーワードなしで数字が2つ → 先が打数・後がパット
+  if(score===null && nums.length>=1) score = nums[0];
+  if(putts===null && nums.length>=2) putts = nums[1];
+  if(ob===null    && nums.length>=3) ob    = nums[2];
+
+  // 反映
+  var applied = [];
+  if(holePar!==null){
+    setHolePar(n, holePar);
+    applied.push('パー'+holePar);
+  }
+  if(score!==null && score>=1 && score<=15){
+    document.getElementById('hs-'+n).value = score;
+    document.getElementById('hs-'+n).classList.add('filled');
+    currentHoleData[n-1].score = score;
+    applied.push('打数'+score);
+  }
+  if(putts!==null && putts>=0 && putts<=10){
+    document.getElementById('hp-'+n).value = putts;
+    document.getElementById('hp-'+n).classList.add('filled');
+    currentHoleData[n-1].putts = putts;
+    applied.push('パット'+putts);
+  }
+  if(ob!==null && ob>=0 && ob<=10){
+    document.getElementById('hob-'+n).value = ob;
+    currentHoleData[n-1].ob = ob;
+    applied.push('OB '+ob);
+  }
+
+  if(applied.length>0){
+    result.textContent = '✓ ' + applied.join(' / ') + ' を入力しました';
+    result.style.color = '#0F6E56';
+    updateTotals();
+  } else {
+    result.textContent = '⚠️ 認識できませんでした。もう一度お試しください';
+    result.style.color = '#A32D2D';
+  }
+}
+
+function updateTotals(){
+  var totalScore=0, totalPutts=0, filled=0, hasPutts=false;
+  for(var i=0;i<18;i++){
+    if(currentHoleData[i].score!==null){ totalScore+=currentHoleData[i].score; filled++; }
+    if(currentHoleData[i].putts!==null){ totalPutts+=currentHoleData[i].putts; hasPutts=true; }
+  }
+  document.getElementById('tot-filled').textContent=filled;
+  document.getElementById('tot-score').textContent=filled>0?totalScore:'—';
+  document.getElementById('tot-putts').textContent=hasPutts?totalPutts:'—';
+  if(filled>0){
+    var holeparSum = currentHoleData.filter(function(h){return h.score!==null;}).reduce(function(a,h){return a+(h.par||4);},0);
+    var d=totalScore-holeparSum;
+    var el=document.getElementById('tot-diff');
+    el.textContent=filled===18?(d===0?'イーブン':(d>0?'+'+d:''+d)):(filled+'H入力済');
+    el.style.color=d>0?'#A32D2D':d<0?'#0F6E56':'#888';
+  } else {
+    document.getElementById('tot-diff').textContent='';
+  }
+}
+
+function clearForm(){
+  document.getElementById('f-round').value='';
+  document.getElementById('f-course').value='';
+  document.getElementById('f-date').value=fmtDate();
+  document.getElementById('f-par').value='72';
+  initHoleData();
+  buildHoles();
+  updateTotals();
+  lastWeather=null; lastGps=null;
+  document.getElementById('weather-body').innerHTML='<div style="text-align:center;padding:8px;font-size:13px;color:#aaa">ボタンを押すと現在地の天気を取得します</div>';
+  document.getElementById('gps-info-box').innerHTML='';
+  var btn=document.getElementById('gps-btn');
+  btn.disabled=false;
+  btn.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg> GPS で現在地の天気を取得';
+}
+
+function saveAll(){
+  // 未保存ホールの入力値を currentHoleData に反映
+  for(var i=1;i<=18;i++){
+    var sv=document.getElementById('hs-'+i).value;
+    var pv=document.getElementById('hp-'+i).value;
+    var obv=document.getElementById('hob-'+i).value;
+    var cv=document.getElementById('hcmt-'+i).value;
+    if(sv) currentHoleData[i-1].score=parseInt(sv);
+    if(pv) currentHoleData[i-1].putts=parseInt(pv);
+    currentHoleData[i-1].ob=obv?parseInt(obv):0;
+    currentHoleData[i-1].comment=cv?cv.trim():'';
+    currentHoleData[i-1].media=currentHoleData[i-1].media||[];
+  }
+  var filled=currentHoleData.filter(function(h){return h.score!==null;}).length;
+  if(filled===0){ alert('少なくとも1ホール入力してください'); return; }
+  var roundName=document.getElementById('f-round').value.trim()||'';
+  var course=document.getElementById('f-course').value.trim()||'名称未設定';
+  var date=document.getElementById('f-date').value;
+  var par=parseInt(document.getElementById('f-par').value);
+  if(isNaN(par)||par<60||par>80){ alert('コースパーを正しく入力してください（60〜80）'); return; }
+  var totalScore=0, totalPutts=0, hasPutts=false;
+  var holes=currentHoleData.map(function(h){
+    if(h.score!==null) totalScore+=h.score;
+    if(h.putts!==null){totalPutts+=h.putts;hasPutts=true;}
+    return{par:h.par||4,score:h.score,putts:h.putts,ob:h.ob||0,comment:h.comment||'',media:h.media||[]};
+  });
+  var weatherSnap=null;
+  if(lastWeather){var c=lastWeather.current,wi=wmoInfo(c.weather_code);weatherSnap={icon:wi.icon,label:wi.label,temp:Math.round(c.temperature_2m),wind:Math.round(c.wind_speed_10m),humid:Math.round(c.relative_humidity_2m)};}
+  var gpsSnap=lastGps?{lat:lastGps.lat,lon:lastGps.lon}:null;
+  records.unshift({id:Date.now(),roundName:roundName,course:course,date:date,par:par,holes:holes,total:totalScore,filled:filled,totalPutts:hasPutts?totalPutts:null,weather:weatherSnap,gps:gpsSnap});
+  persist(); clearForm(); go('list');
+}
+
+// ---- List ----
+function diffInfo(d){ if(d===0)return{t:'イーブン',cls:'deven'}; return{t:(d>0?'+':'')+d,cls:d>0?'dplus':'dminus'}; }
+
+function renderList(){
+  var el=document.getElementById('list-body');
+  if(!records.length){
+    el.innerHTML='<div class="card empty"><div class="empty-icon">⛳</div><div class="empty-title">記録がありません</div><div class="empty-sub">最初のラウンドを記録しましょう</div><button class="btn-save-all" style="max-width:180px;margin:0 auto;display:block" onclick="startNewRound()">＋ 記録を追加</button></div>';
+    return;
+  }
+  el.innerHTML=records.slice().sort(function(a,b){
+    var da=a.date.replace(/\//g,'-'), db=b.date.replace(/\//g,'-');
+    return da>db?-1:da<db?1:0;
+  }).map(function(r){
+    var di=diffInfo(r.total-r.par);
+    var totalPar=r.par;
+    var frontBadges=r.holes.slice(0,9).map(function(h,i){
+      if(h.score===null)return'<span class="badge b-par" style="opacity:0.25">—</span>';
+      var hpar=h.par||4;
+      return'<span class="badge '+badgeCls(h.score-hpar)+'">'+h.score+'</span>';
+    }).join('');
+    var backBadges=r.holes.slice(9,18).map(function(h,i){
+      if(h.score===null)return'<span class="badge b-par" style="opacity:0.25">—</span>';
+      var hpar=h.par||4;
+      return'<span class="badge '+badgeCls(h.score-hpar)+'">'+h.score+'</span>';
+    }).join('');
+    var frontSum=r.holes.slice(0,9).reduce(function(a,h){return a+(h.score||0);},0);
+    var backSum=r.holes.slice(9,18).reduce(function(a,h){return a+(h.score||0);},0);
+    var weatherHtml=r.weather?'<div class="rc-weather">'+r.weather.icon+' '+r.weather.temp+'°C · '+r.weather.label+' · 風'+r.weather.wind+'m/s</div>':'';
+    var puttsHtml=r.totalPutts!==null?'<div class="rc-putts">🏌️ 合計パット '+r.totalPutts+'</div>':'';
+    var gpsHtml=r.gps?'<span style="font-size:11px;color:#aaa"> · 📍'+r.gps.lat+'</span>':'';
+    return'<div class="card">'+
+      '<div class="rc-head">'+
+        '<div>'+
+        (r.roundName?'<div style="font-size:11px;font-weight:600;color:#0F6E56;margin-bottom:2px">'+r.roundName+'</div>':'')+
+        '<div class="rc-course">'+r.course+'</div>'+
+        '<div class="rc-meta">📅 '+dispDate(r.date)+(r.filled<18?' · '+r.filled+'H':'')+gpsHtml+'</div>'+
+        weatherHtml+puttsHtml+'</div>'+
+        '<div style="text-align:right"><div class="rc-score">'+r.total+'</div><div class="rc-diff '+di.cls+'">'+di.t+'</div></div>'+
+      '</div>'+
+      '<div style="border-top:1px solid #f0f0eb;padding-top:8px">'+
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'+
+          '<span style="font-size:10px;color:#aaa;font-weight:600;white-space:nowrap">前半</span>'+
+          '<div class="badges" style="border:none;padding:0;flex:1">'+frontBadges+'</div>'+
+          '<span style="font-size:11px;font-weight:600;color:#555;white-space:nowrap;min-width:24px;text-align:right">'+frontSum+'</span>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:6px">'+
+          '<span style="font-size:10px;color:#aaa;font-weight:600;white-space:nowrap">後半</span>'+
+          '<div class="badges" style="border:none;padding:0;flex:1">'+backBadges+'</div>'+
+          '<span style="font-size:11px;font-weight:600;color:#555;white-space:nowrap;min-width:24px;text-align:right">'+backSum+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="rc-actions">'+
+        '<button class="btn-detail" onclick="openDetail('+r.id+')">📋 詳細</button>'+
+        '<button class="btn-edit" onclick="openEdit('+r.id+')">✏️ 編集</button>'+
+        '<button class="btn-delete" onclick="deleteRecord('+r.id+')">🗑 削除</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+// ---- Edit modal ----
+function openEdit(id){
+  var r=records.find(function(x){return x.id===id;});
+  if(!r)return;
+  editingId=id;
+  document.getElementById('em-round').value=r.roundName||'';
+  document.getElementById('em-course').value=r.course;
+  document.getElementById('em-date').value=r.date.replace(/\//g,'-');
+  document.getElementById('em-par').value=r.par;
+  var html='';
+  for(var i=0;i<18;i++){
+    var n=i+1;
+    var s=r.holes[i]&&r.holes[i].score!==null?r.holes[i].score:'';
+    var p=r.holes[i]&&r.holes[i].putts!==null?r.holes[i].putts:'';
+    var ob=r.holes[i]&&r.holes[i].ob?r.holes[i].ob:'';
+    var hp=r.holes[i]&&r.holes[i].par?r.holes[i].par:4;
+    var cmt=r.holes[i]&&r.holes[i].comment?r.holes[i].comment:'';
+    var existingMedia=r.holes[i]&&r.holes[i].media?r.holes[i].media:[];
+    // 編集中メディアをグローバルに保持
+    if(!window.emMedia) window.emMedia={};
+    window.emMedia[n]=existingMedia.slice();
+    html+='<div style="margin-bottom:8px;padding:10px;background:#f9f9f6;border:1px solid #e8e8e0;border-radius:10px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
+        '<div style="font-size:12px;font-weight:600;color:#555">'+n+'ホール</div>'+
+        '<div style="display:flex;gap:3px">'+
+          '<button onclick="toggleEmPar(this,'+n+',3)" class="hpar-btn'+(hp===3?' hpar-active':'')+'\" style="padding:4px 10px;font-size:12px">P3</button>'+
+          '<button onclick="toggleEmPar(this,'+n+',4)" class="hpar-btn'+(hp===4?' hpar-active':'')+'\" style="padding:4px 10px;font-size:12px">P4</button>'+
+          '<button onclick="toggleEmPar(this,'+n+',5)" class="hpar-btn'+(hp===5?' hpar-active':'')+'\" style="padding:4px 10px;font-size:12px">P5</button>'+
+          '<input type="hidden" id="em-par-'+n+'" value="'+hp+'">'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:6px">'+
+        '<div class="hf"><label>打数</label><input type="number" inputmode="numeric" id="em-s-'+n+'" value="'+s+'" placeholder="—"></div>'+
+        '<div class="hf"><label>パット</label><input type="number" inputmode="numeric" id="em-p-'+n+'" value="'+p+'" placeholder="—"></div>'+
+        '<div class="hf"><label>OB</label><input type="number" inputmode="numeric" id="em-ob-'+n+'" value="'+ob+'" placeholder="0"></div>'+
+      '</div>'+
+      '<div class="hf" style="margin-bottom:6px"><label>コメント</label><textarea id="em-cmt-'+n+'" rows="2" style="width:100%;padding:7px 9px;border-radius:7px;border:1px solid #d8d8d0;background:#fff;font-size:12px;resize:none;font-family:inherit" placeholder="メモ（任意）">'+cmt+'</textarea></div>'+
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'+
+        '<button class="media-btn" onclick="triggerEmMedia('+n+')">📎 写真・動画</button>'+
+        '<input type="file" id="em-media-input-'+n+'" accept="image/*,video/*" style="display:none" onchange="onEmMediaSelected('+n+',this)">'+
+      '</div>'+
+      '<div id="em-media-grid-'+n+'" style="display:flex;gap:5px;flex-wrap:wrap"></div>'+
+    '</div>';
+  }
+  document.getElementById('em-holes').innerHTML=html;
+  // 既存メディアをグリッドに描画
+  for(var j=1;j<=18;j++) renderEmMediaGrid(j);
+  document.getElementById('edit-modal').classList.add('on');
+}
+
+function closeModal(){ document.getElementById('edit-modal').classList.remove('on'); editingId=null; window.emMedia={}; }
+
+function openDetail(id){
+  var r=records.find(function(x){return x.id===id;});
+  if(!r) return;
+  var di=diffInfo(r.total-r.par);
+  document.getElementById('dm-title').textContent=(r.roundName||r.course||'ラウンド詳細');
+  var metaParts=['📅 '+dispDate(r.date), r.course];
+  if(r.roundName) metaParts.unshift('🏷 '+r.roundName);
+  if(r.weather) metaParts.push(r.weather.icon+' '+r.weather.temp+'°C · '+r.weather.label);
+  if(r.gps) metaParts.push('📍'+r.gps.lat+', '+r.gps.lon);
+  document.getElementById('dm-meta').innerHTML=metaParts.join(' &nbsp;·&nbsp; ');
+  document.getElementById('dm-summary').innerHTML=
+    '<div class="dsb-item"><div class="dsb-label">合計スコア</div><div class="dsb-val">'+r.total+'</div></div>'+
+    '<div class="dsb-item"><div class="dsb-label">対パー</div><div class="dsb-val '+di.cls+'">'+di.t+'</div></div>'+
+    '<div class="dsb-item"><div class="dsb-label">合計パット</div><div class="dsb-val">'+(r.totalPutts!==null?r.totalPutts:'—')+'</div></div>';
+  var html='';
+  r.holes.forEach(function(h,i){
+    var n=i+1;
+    var hasData=h.score!==null;
+    var numCls=hasData?'':'no-data';
+    var scoreBadge='';
+    if(hasData){
+      var d=h.score-(h.par||4);
+      scoreBadge='<span class="detail-badge '+badgeCls(d)+'">'+badgeLabel(d)+'</span>';
+    }
+    var scores=hasData
+      ? '<span class="detail-score-val">'+h.score+'打</span>'+
+        (h.putts!==null?'<span class="detail-score-meta">'+h.putts+'パット</span>':'')+
+        (h.ob?'<span class="detail-score-meta">OB '+h.ob+'</span>':'')+
+        scoreBadge
+      : '<span class="detail-score-meta">未入力</span>';
+    var parLabel='<span style="font-size:11px;color:#888;margin-left:auto">Par '+(h.par||4)+'</span>';
+    var comment=h.comment?'<div class="detail-hole-comment">'+h.comment+'</div>':'';
+    var mediaHtml='';
+    if(h.media&&h.media.length){
+      mediaHtml='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">'+
+        h.media.map(function(item,mi){
+          var thumb=item.type==='video'
+            ?'<video src="'+item.data+'" muted playsinline style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e8e8e0;cursor:pointer" onclick="openDetailMedia(\''+item.type+'\',\''+item.data+'\')"></video>'
+            :'<img src="'+item.data+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e8e8e0;cursor:pointer" onclick="openDetailMedia(\''+item.type+'\',\''+item.data+'\')">';
+          return thumb;
+        }).join('')+
+      '</div>';
+    }
+    html+='<div class="detail-hole-row">'+
+      '<div class="detail-hole-num '+numCls+'">'+n+'</div>'+
+      '<div class="detail-hole-body">'+
+        '<div class="detail-hole-scores">'+scores+parLabel+'</div>'+
+        comment+mediaHtml+
+      '</div>'+
+    '</div>';
+  });
+  document.getElementById('dm-holes').innerHTML=html;
+  document.getElementById('detail-modal').classList.add('on');
+}
+
+function closeDetailModal(){ document.getElementById('detail-modal').classList.remove('on'); }
+
+function openDetailMedia(type, data){
+  var content = document.getElementById('media-viewer-content');
+  if(type === 'video'){
+    content.innerHTML = '<video src="'+data+'" controls autoplay style="max-width:95vw;max-height:80vh;border-radius:10px"></video>';
+  } else {
+    content.innerHTML = '<img src="'+data+'" style="max-width:95vw;max-height:80vh;border-radius:10px;object-fit:contain">';
+  }
+  document.getElementById('media-viewer').classList.add('on');
+}
+
+function saveEdit(){
+  var idx=records.findIndex(function(x){return x.id===editingId;});
+  if(idx===-1)return;
+  var r=records[idx];
+  r.roundName=document.getElementById('em-round').value.trim()||'';
+  r.course=document.getElementById('em-course').value.trim()||'名称未設定';
+  r.date=document.getElementById('em-date').value;
+  r.par=parseInt(document.getElementById('em-par').value);
+  var total=0,filled=0,totalPutts=0,hasPutts=false;
+  var holes=[];
+  for(var i=1;i<=18;i++){
+    var sv=document.getElementById('em-s-'+i).value;
+    var pv=document.getElementById('em-p-'+i).value;
+    var obv=document.getElementById('em-ob-'+i).value;
+    var hpv=document.getElementById('em-par-'+i);
+    var cmtv=document.getElementById('em-cmt-'+i);
+    var score=sv?parseInt(sv):null;
+    var putts=pv?parseInt(pv):null;
+    var ob=obv?parseInt(obv):0;
+    var hp=hpv?parseInt(hpv.value):4;
+    var cmt=cmtv?cmtv.value.trim():'';
+    var media=(window.emMedia&&window.emMedia[i])?window.emMedia[i]:[];
+    holes.push({par:hp,score:score,putts:putts,ob:ob,comment:cmt,media:media});
+    if(score!==null){total+=score;filled++;}
+    if(putts!==null){totalPutts+=putts;hasPutts=true;}
+  }
+  r.holes=holes; r.total=total; r.filled=filled;
+  r.totalPutts=hasPutts?totalPutts:null;
+  // ホール別パーの合計でコースパーを再計算
+  r.par=holes.reduce(function(a,h){return a+(h.par||4);},0);
+  records[idx]=r;
+  persist(); closeModal(); renderList();
+}
+
+function deleteRecord(id){
+  var overlay=document.getElementById('confirm-overlay');
+  var okBtn=document.getElementById('confirm-ok-btn');
+  overlay.classList.add('on');
+  okBtn.onclick=function(){
+    records=records.filter(function(r){return r.id!==id;});
+    persist(); renderList();
+    overlay.classList.remove('on');
+  };
+}
+function closeConfirm(){ document.getElementById('confirm-overlay').classList.remove('on'); }
+
+// ---- Stats ----
+function renderStats(){
+  var sg=document.getElementById('sg');
+  var ca=document.getElementById('ca');
+  if(!records.length){
+    sg.innerHTML='<div style="grid-column:1/-1" class="card empty"><div class="empty-icon">📊</div><div class="empty-title">記録がありません</div></div>';
+    ca.innerHTML=''; return;
+  }
+
+  var tots=records.map(function(r){return r.total;});
+  var best=Math.min.apply(null,tots);
+  var avg=Math.round(tots.reduce(function(a,b){return a+b;},0)/tots.length);
+  var puttsRecs=records.filter(function(r){return r.totalPutts!==null;});
+  var avgPutts=puttsRecs.length?Math.round(puttsRecs.reduce(function(a,r){return a+r.totalPutts;},0)/puttsRecs.length):'—';
+
+  // 前半・後半スコア集計
+  var frontScores=[],backScores=[];
+  records.forEach(function(r){
+    var f=r.holes.slice(0,9).reduce(function(a,h){return a+(h.score||0);},0);
+    var b=r.holes.slice(9,18).reduce(function(a,h){return a+(h.score||0);},0);
+    var fFilled=r.holes.slice(0,9).filter(function(h){return h.score!==null;}).length;
+    var bFilled=r.holes.slice(9,18).filter(function(h){return h.score!==null;}).length;
+    if(fFilled===9) frontScores.push(f);
+    if(bFilled===9) backScores.push(b);
+  });
+  var bestFront=frontScores.length?Math.min.apply(null,frontScores):'—';
+  var avgFront=frontScores.length?Math.round(frontScores.reduce(function(a,b){return a+b;},0)/frontScores.length):'—';
+  var bestBack=backScores.length?Math.min.apply(null,backScores):'—';
+  var avgBack=backScores.length?Math.round(backScores.reduce(function(a,b){return a+b;},0)/backScores.length):'—';
+
+  // 平均OB
+  var obRecs=records.filter(function(r){return r.holes.some(function(h){return h.ob>0;});});
+  var avgOB=obRecs.length?(Math.round(obRecs.reduce(function(a,r){
+    return a+r.holes.reduce(function(s,h){return s+(h.ob||0);},0);
+  },0)/obRecs.length*10)/10):'—';
+
+  sg.innerHTML=
+    '<div class="sh"><div class="sh-lbl">平均パット</div><div class="sh-val">'+avgPutts+'</div></div>'+
+    '<div class="sh"><div class="sh-lbl">ベスト</div><div class="sh-val" style="color:#0F6E56">'+best+'</div></div>'+
+    '<div class="sh"><div class="sh-lbl">平均スコア</div><div class="sh-val">'+avg+'</div></div>'+
+    '<div class="sh"><div class="sh-lbl">ハーフベスト</div>'+
+      '<div class="sh-val" style="color:#0F6E56">'+
+        (bestFront!=='—'||bestBack!=='—' ? Math.min.apply(null,[bestFront,bestBack].filter(function(v){return v!=='—';})) : '—')+
+      '</div>'+
+    '</div>'+
+    (goalScore ? '<div class="sh" style="grid-column:1/-1;background:#FFF8E6;border-color:#FAE9B0"><div class="sh-lbl">目標スコア</div><div style="display:flex;align-items:baseline;justify-content:center;gap:10px"><div class="sh-val" style="color:#E87C2B">'+goalScore+'</div><div style="font-size:13px;color:'+(best<=goalScore?'#0F6E56':'#A32D2D')+';font-weight:600">'+(best<=goalScore?'✓ ベストで達成中':'ベストからあと '+(best-goalScore)+' 打')+'</div></div></div>' : '');
+
+  // ハーフスコア表
+  var sorted=records.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0;});
+  var rows=sorted.map(function(r){
+    var f=r.holes.slice(0,9).reduce(function(a,h){return a+(h.score||0);},0);
+    var b=r.holes.slice(9,18).reduce(function(a,h){return a+(h.score||0);},0);
+    var fFilled=r.holes.slice(0,9).filter(function(h){return h.score!==null;}).length;
+    var bFilled=r.holes.slice(9,18).filter(function(h){return h.score!==null;}).length;
+    var fStr=fFilled===9?String(f):(fFilled>0?f+'*':'—');
+    var bStr=bFilled===9?String(b):(bFilled>0?b+'*':'—');
+    var di=diffInfo(r.total-r.par);
+    return'<tr>'+
+      '<td style="padding:8px 6px;font-size:12px;color:#555;white-space:nowrap">'+dispDate(r.date)+'</td>'+
+      '<td style="padding:8px 6px;font-size:12px;color:#555;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.roundName||r.course)+'</td>'+
+      '<td style="padding:8px 6px;font-size:13px;font-weight:600;text-align:center;color:#1a1a1a">'+fStr+'</td>'+
+      '<td style="padding:8px 6px;font-size:13px;font-weight:600;text-align:center;color:#1a1a1a">'+bStr+'</td>'+
+      '<td style="padding:8px 6px;font-size:14px;font-weight:700;text-align:center;color:#1a1a1a">'+r.total+'</td>'+
+      '<td style="padding:8px 6px;font-size:12px;font-weight:600;text-align:center" class="'+di.cls+'">'+di.t+'</td>'+
+    '</tr>';
+  }).join('');
+
+  ca.innerHTML='<div class="chart-wrap">'+
+    '<div class="chart-lbl">📋 スコア一覧</div>'+
+    '<table style="width:100%;border-collapse:collapse">'+
+      '<thead><tr style="border-bottom:1px solid #ebebeb">'+
+        '<th style="padding:6px 6px;font-size:10px;color:#aaa;font-weight:600;text-align:left">日付</th>'+
+        '<th style="padding:6px 6px;font-size:10px;color:#aaa;font-weight:600;text-align:left">名称</th>'+
+        '<th style="padding:6px 6px;font-size:10px;color:#aaa;font-weight:600;text-align:center">前半</th>'+
+        '<th style="padding:6px 6px;font-size:10px;color:#aaa;font-weight:600;text-align:center">後半</th>'+
+        '<th style="padding:6px 6px;font-size:10px;color:#aaa;font-weight:600;text-align:center">合計</th>'+
+        '<th style="padding:6px 6px;font-size:10px;color:#aaa;font-weight:600;text-align:center">対Par</th>'+
+      '</tr></thead>'+
+      '<tbody>'+rows+'</tbody>'+
+      '<tfoot><tr style="border-top:2px solid #ebebeb;background:#f9f9f6">'+
+        '<td colspan="2" style="padding:8px 6px;font-size:11px;font-weight:600;color:#555">ベスト / 平均</td>'+
+        '<td style="padding:8px 6px;font-size:12px;font-weight:700;text-align:center;color:#0F6E56">'+bestFront+'<br><span style="font-size:10px;color:#888;font-weight:400">avg '+avgFront+'</span></td>'+
+        '<td style="padding:8px 6px;font-size:12px;font-weight:700;text-align:center;color:#0F6E56">'+bestBack+'<br><span style="font-size:10px;color:#888;font-weight:400">avg '+avgBack+'</span></td>'+
+        '<td style="padding:8px 6px;font-size:12px;font-weight:700;text-align:center;color:#0F6E56">'+best+'<br><span style="font-size:10px;color:#888;font-weight:400">avg '+avg+'</span></td>'+
+        '<td></td>'+
+      '</tr></tfoot>'+
+    '</table>'+
+    '<div style="font-size:10px;color:#aaa;margin-top:6px">* 9ホール未満の入力</div>'+
+  '</div>'+
+  makeCharts(sorted);
+}
+
+function makeCharts(sorted){
+  if(sorted.length<2) return '<div class="chart-wrap" style="margin-top:10px;text-align:center;padding:20px;font-size:13px;color:#888">2ラウンド以上でグラフ表示</div>';
+  var data=sorted.slice().sort(function(a,b){
+    var da=a.date.replace(/\//g,'-'), db=b.date.replace(/\//g,'-');
+    return da<db?-1:da>db?1:0;
+  });
+  var W=340, padL=28, padR=12, padT=24, padB=32;
+
+  function makeChart(title, color, vals){
+    var defined=vals.filter(function(o){return o.v!==null;});
+    if(!defined.length) return '<div class="chart-wrap" style="margin-top:10px"><div class="chart-lbl">'+title+'</div><div style="text-align:center;padding:16px;font-size:12px;color:#aaa">データなし</div></div>';
+    var H=padT+80+padB;
+    var plotW=W-padL-padR, plotH=80;
+    var mn=Math.min.apply(null,defined.map(function(o){return o.v;}))-2;
+    var mx=Math.max.apply(null,defined.map(function(o){return o.v;}))+2;
+    var range=mx-mn||1;
+    var n=vals.length;
+
+    function cx(i){ return padL+(n===1?plotW/2:i/(n-1)*plotW); }
+    function cy(v){ return padT+(1-(v-mn)/range)*plotH; }
+
+    var pointGroups=[], curGroup=[], allPts=[];
+    vals.forEach(function(o,i){
+      if(o.v===null){ if(curGroup.length){pointGroups.push(curGroup);curGroup=[];} allPts.push(null); }
+      else{ var pt={x:cx(i),y:cy(o.v),v:o.v,date:o.date}; curGroup.push(pt); allPts.push(pt); }
+    });
+    if(curGroup.length) pointGroups.push(curGroup);
+
+    // グリッド線（スコアは10刻み、パットは5刻み）
+    var step=color==='#1D9E75'?10:5;
+    var gridMin=Math.ceil(mn/step)*step;
+    var gridLines='';
+    for(var gv=gridMin;gv<=mx;gv+=step){
+      var gy=cy(gv);
+      if(gy>=padT&&gy<=padT+plotH){
+        gridLines+='<line x1="'+padL+'" y1="'+gy+'" x2="'+(padL+plotW)+'" y2="'+gy+'" stroke="#ebebeb" stroke-width="0.8"/>'+
+                   '<text x="'+(padL-4)+'" y="'+(gy+3)+'" text-anchor="end" font-size="8" fill="#bbb">'+gv+'</text>';
+      }
+    }
+
+    // 横軸線
+    var axisLine='<line x1="'+padL+'" y1="'+(padT+plotH)+'" x2="'+(padL+plotW)+'" y2="'+(padT+plotH)+'" stroke="#d8d8d0" stroke-width="1"/>';
+
+    // 折れ線
+    var polylines=pointGroups.map(function(g){
+      return g.length<2?'':'<polyline points="'+g.map(function(p){return p.x+','+p.y;}).join(' ')+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round"/>';
+    }).join('');
+
+    // ドット・スコアラベル・日付ラベル
+    var minGap=28, lastLabelX=-999;
+    var dots=allPts.map(function(p){
+      if(!p) return '';
+      var short=p.date.replace(/\//g,'-').substring(5).replace('-','/');
+      var dateLabel='';
+      if(p.x-lastLabelX>=minGap){ dateLabel='<text x="'+p.x+'" y="'+(padT+plotH+12)+'" text-anchor="middle" font-size="8" fill="#aaa">'+short+'</text>'; lastLabelX=p.x; }
+      // 目盛り線
+      var tick='<line x1="'+p.x+'" y1="'+(padT+plotH)+'" x2="'+p.x+'" y2="'+(padT+plotH+3)+'" stroke="#d8d8d0" stroke-width="1"/>';
+      return '<circle cx="'+p.x+'" cy="'+p.y+'" r="4" fill="'+color+'" stroke="#fff" stroke-width="1.5"/>'+
+             '<text x="'+p.x+'" y="'+(p.y-7)+'" text-anchor="middle" font-size="9" fill="#555">'+p.v+'</text>'+
+             tick+dateLabel;
+    }).join('');
+
+    // 目標ラインをスコアグラフにだけ追加
+    var goalLine='';
+    if(color==='#1D9E75' && goalScore && goalScore>=mn && goalScore<=mx){
+      var gly=cy(goalScore);
+      goalLine='<line x1="'+padL+'" y1="'+gly+'" x2="'+(padL+plotW)+'" y2="'+gly+'" stroke="#E87C2B" stroke-width="1.5" stroke-dasharray="4,3"/>'+
+               '<text x="'+(padL+plotW+3)+'" y="'+(gly+3)+'" font-size="9" fill="#E87C2B" font-weight="600">目標</text>';
+    }
+
+    return '<div class="chart-wrap" style="margin-top:10px">'+
+      '<div class="chart-lbl">'+title+'</div>'+
+      '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;overflow:visible">'+
+        gridLines+axisLine+goalLine+polylines+dots+
+      '</svg></div>';
+  }
+
+  var scoreVals=data.map(function(r){return{v:r.total,date:r.date};});
+  var puttsVals=data.map(function(r){return{v:r.totalPutts!==null?r.totalPutts:null,date:r.date};});
+
+  return makeChart('📈 スコア推移','#1D9E75',scoreVals)+
+         makeChart('🏌️ パット数推移','#378ADD',puttsVals);
+}
+
+// ---- Nav ----
+function startNewRound(){ go('input'); }
+function go(name){
+  ['list','input','stats','data'].forEach(function(n,i){
+    var sec=document.getElementById('s-'+n);
+    if(sec) sec.classList.toggle('on',n===name);
+    var btn=document.querySelectorAll('.nb')[i];
+    if(btn) btn.classList.toggle('on',n===name);
+  });
+  if(name==='list')renderList();
+  if(name==='stats')renderStats();
+}
+
+// ---- Search ----
+function clearSearch(){
+  document.getElementById('search-input').value='';
+  renderList();
+}
+
+// renderList に検索フィルターを適用（既存関数を上書き）
+var _origRenderList = renderList;
+renderList = function(){
+  var q = (document.getElementById('search-input')||{value:''}).value.trim().toLowerCase();
+  if(!q){ _origRenderList(); return; }
+  var el=document.getElementById('list-body');
+  var filtered=records.filter(function(r){
+    return (r.course||'').toLowerCase().indexOf(q)>-1 ||
+           (r.roundName||'').toLowerCase().indexOf(q)>-1 ||
+           (r.date||'').indexOf(q)>-1;
+  });
+  if(!filtered.length){
+    el.innerHTML='<div class="card empty"><div class="empty-icon">🔍</div><div class="empty-title">「'+q+'」に一致する記録がありません</div></div>';
+    return;
+  }
+  // 一時的に records を filtered に差し替えて描画
+  var orig=records; records=filtered; _origRenderList(); records=orig;
+};
+
+// ---- Onboarding ----
+function initOnboard(){
+  var dismissed=localStorage.getItem('golflog_onboard_dismissed');
+  if(!dismissed){
+    document.getElementById('onboard-banner').style.display='block';
+  }
+}
+function closeOnboard(){
+  document.getElementById('onboard-banner').style.display='none';
+  localStorage.setItem('golflog_onboard_dismissed','1');
+}
+
+// ---- Export / Import ----
+function exportData(){
+  if(!records.length){ alert('エクスポートする記録がありません'); return; }
+  var json=JSON.stringify({version:1,exportedAt:new Date().toISOString(),records:records},null,2);
+  var blob=new Blob([json],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='golf_log_'+fmtDate().replace(/\//g,'-')+'.json';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportCSV(){
+  if(!records.length){ alert('エクスポートする記録がありません'); return; }
+  var rows=[['日付','ラウンド名','コース名','合計','対パー','前半','後半','合計パット']];
+  records.slice().sort(function(a,b){ var da=a.date.replace(/\//g,'-'),db=b.date.replace(/\//g,'-'); return da<db?-1:da>db?1:0; }).forEach(function(r){
+    var f=r.holes.slice(0,9).reduce(function(a,h){return a+(h.score||0);},0);
+    var b=r.holes.slice(9,18).reduce(function(a,h){return a+(h.score||0);},0);
+    var fF=r.holes.slice(0,9).filter(function(h){return h.score!==null;}).length;
+    var bF=r.holes.slice(9,18).filter(function(h){return h.score!==null;}).length;
+    var d=r.total-r.par;
+    rows.push([
+      dispDate(r.date), r.roundName||'', r.course, r.total,
+      d===0?'E':(d>0?'+'+d:''+d),
+      fF===9?f:'', bF===9?b:'',
+      r.totalPutts!==null?r.totalPutts:''
+    ]);
+  });
+  var csv=rows.map(function(r){return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var bom='\uFEFF';
+  var blob=new Blob([bom+csv],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='golf_log_'+fmtDate().replace(/\//g,'-')+'.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importData(input){
+  var file=input.files[0];
+  if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var result=document.getElementById('import-result');
+    try{
+      var data=JSON.parse(e.target.result);
+      var imported=data.records||data;
+      if(!Array.isArray(imported)) throw new Error('形式が正しくありません');
+      var added=0;
+      var existingIds=records.map(function(r){return r.id;});
+      imported.forEach(function(r){
+        if(r.id&&existingIds.indexOf(r.id)===-1){ records.unshift(r); added++; }
+      });
+      persist();
+      result.textContent='✓ '+added+'件の記録を追加しました';
+      result.style.color='#0F6E56';
+      renderList();
+    }catch(err){
+      result.textContent='⚠️ 読み込みに失敗しました: '+err.message;
+      result.style.color='#A32D2D';
+    }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+function deleteAllRecords(){
+  var overlay=document.getElementById('confirm-overlay');
+  document.querySelector('.confirm-msg').textContent='全記録を削除しますか？';
+  document.querySelector('.confirm-sub').textContent='この操作は元に戻せません';
+  overlay.classList.add('on');
+  document.getElementById('confirm-ok-btn').onclick=function(){
+    records=[];
+    persist(); renderList();
+    overlay.classList.remove('on');
+  };
+}
+
+// ---- Goal Score ----
+var goalScore = parseInt(localStorage.getItem('golflog_goal')) || null;
+
+function saveGoal(){
+  var v = parseInt(document.getElementById('goal-score').value);
+  var msg = document.getElementById('goal-msg');
+  if(isNaN(v) || v < 60 || v > 130){
+    goalScore = null;
+    localStorage.removeItem('golflog_goal');
+    msg.textContent = '';
+    return;
+  }
+  goalScore = v;
+  localStorage.setItem('golflog_goal', v);
+  msg.textContent = '✓ 目標スコア ' + v + ' 打を設定しました';
+  msg.style.color = '#0F6E56';
+}
+
+function initGoal(){
+  if(goalScore){
+    var el = document.getElementById('goal-score');
+    if(el) el.value = goalScore;
+  }
+}
+
+initHoleData();
+buildHoles();
+document.getElementById('f-date').value=fmtDate();
+updateTotals();
+renderList();
+initOnboard();
+initGoal();
+</script>
+</body>
+</html>
