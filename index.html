@@ -426,6 +426,59 @@ function persist(){ localStorage.setItem('golflog_v2', JSON.stringify(records));
 function fmtDate(){ var d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0'); }
 function dispDate(s){ return s?s.replace(/-/g,'/'):''; }
 
+// ---- IndexedDB for Media ----
+var idb = null;
+var IDB_NAME = 'golflog_media';
+var IDB_STORE = 'media';
+
+function initIDB(cb){
+  if(idb){ cb(); return; }
+  var req = indexedDB.open(IDB_NAME, 1);
+  req.onupgradeneeded = function(e){
+    e.target.result.createObjectStore(IDB_STORE, {keyPath:'id'});
+  };
+  req.onsuccess = function(e){ idb = e.target.result; cb(); };
+  req.onerror = function(){ console.error('IndexedDB open failed'); cb(); };
+}
+
+function idbSave(item, cb){
+  initIDB(function(){
+    var tx = idb.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).put(item);
+    tx.oncomplete = function(){ cb && cb(); };
+    tx.onerror = function(){ cb && cb(); };
+  });
+}
+
+function idbGet(id, cb){
+  initIDB(function(){
+    var tx = idb.transaction(IDB_STORE,'readonly');
+    var req = tx.objectStore(IDB_STORE).get(id);
+    req.onsuccess = function(){ cb(req.result||null); };
+    req.onerror = function(){ cb(null); };
+  });
+}
+
+function idbDelete(id, cb){
+  initIDB(function(){
+    var tx = idb.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).delete(id);
+    tx.oncomplete = function(){ cb && cb(); };
+  });
+}
+
+function idbGetAll(cb){
+  initIDB(function(){
+    var tx = idb.transaction(IDB_STORE,'readonly');
+    var req = tx.objectStore(IDB_STORE).getAll();
+    req.onsuccess = function(){ cb(req.result||[]); };
+    req.onerror = function(){ cb([]); };
+  });
+}
+
+// メディアIDを生成
+function genMediaId(){ return 'media_'+ Date.now() +'_'+ Math.random().toString(36).substr(2,6); }
+
 // ---- Weather ----
 function wmoInfo(c){ if(c===0)return{icon:'☀️',label:'快晴'}; if(c<=2)return{icon:'⛅',label:'晴れ時々曇り'}; if(c===3)return{icon:'☁️',label:'曇り'}; if(c<=49)return{icon:'🌫️',label:'霧'}; if(c<=59)return{icon:'🌦️',label:'霧雨'}; if(c<=69)return{icon:'🌧️',label:'雨'}; if(c<=79)return{icon:'❄️',label:'雪'}; if(c<=82)return{icon:'🌧️',label:'にわか雨'}; if(c<=86)return{icon:'🌨️',label:'にわか雪'}; return{icon:'⛈️',label:'雷雨'}; }
 function windDir(deg){ var d=['北','北北東','北東','東北東','東','東南東','南東','南南東','南','南南西','南西','西南西','西','西北西','北西','北北西']; return d[Math.round(deg/22.5)%16]; }
@@ -473,7 +526,7 @@ function renderWeather(data){
 // ---- Hole data helpers ----
 function initHoleData(){
   currentHoleData=[];
-  for(var i=1;i<=18;i++) currentHoleData.push({hole:i,par:4,score:null,putts:null,comment:'',media:[],saved:false});
+  for(var i=1;i<=18;i++) currentHoleData.push({hole:i,par:4,score:null,putts:null,comment:'',mediaIds:[],mediaItems:[],saved:false});
 }
 function getHolePar(holeNum){
   return currentHoleData[holeNum-1] ? currentHoleData[holeNum-1].par : 4;
@@ -757,7 +810,7 @@ function stopCommentVoice(){
   }
 }
 
-// ---- Media Attachments ----
+// ---- Media Attachments (IndexedDB) ----
 function triggerMediaPicker(n){
   document.getElementById('media-input-'+n).click();
 }
@@ -766,20 +819,23 @@ function onMediaSelected(n, input){
   var files = input.files;
   if(!files || !files.length) return;
   var file = files[0];
-  // サイズチェック: 画像20MB / 動画50MB
-  var limitMB = file.type.startsWith('video') ? 50 : 20;
+  var limitMB = file.type.startsWith('video') ? 200 : 50;
   if(file.size > limitMB * 1024 * 1024){
-    alert(file.type.startsWith('video') ? '動画は50MB以下にしてください' : '画像は20MB以下にしてください');
+    alert((file.type.startsWith('video') ? '動画は200MB' : '画像は50MB') + '以下にしてください');
     input.value = ''; return;
   }
   var reader = new FileReader();
   reader.onload = function(e){
-    var item = { type: file.type.startsWith('video') ? 'video' : 'image', data: e.target.result, name: file.name };
-    if(!currentHoleData[n-1].media) currentHoleData[n-1].media = [];
-    currentHoleData[n-1].media.push(item);
-    renderMediaGrid(n);
-    // コメントボタンをオレンジに
-    document.getElementById('hcmt-btn-'+n).classList.add('has-comment');
+    var id = genMediaId();
+    var item = { id: id, type: file.type.startsWith('video') ? 'video' : 'image', data: e.target.result, name: file.name };
+    idbSave(item, function(){
+      if(!currentHoleData[n-1].mediaItems) currentHoleData[n-1].mediaItems = [];
+      currentHoleData[n-1].mediaItems.push(item);
+      if(!currentHoleData[n-1].mediaIds) currentHoleData[n-1].mediaIds = [];
+      currentHoleData[n-1].mediaIds.push(id);
+      renderMediaGrid(n);
+      document.getElementById('hcmt-btn-'+n).classList.add('has-comment');
+    });
   };
   reader.readAsDataURL(file);
   input.value = '';
@@ -788,13 +844,13 @@ function onMediaSelected(n, input){
 function renderMediaGrid(n){
   var grid = document.getElementById('media-grid-'+n);
   if(!grid) return;
-  var items = currentHoleData[n-1].media || [];
+  var items = currentHoleData[n-1].mediaItems || [];
   if(!items.length){ grid.innerHTML = ''; return; }
   grid.innerHTML = items.map(function(item, idx){
     var thumb = item.type === 'video'
       ? '<video src="'+item.data+'" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><span class="media-type-badge">動画</span>'
       : '<img src="'+item.data+'" alt="添付画像">';
-    return '<div class="media-thumb" onclick="openMediaViewer('+n+','+idx+')" style="aspect-ratio:1">'+
+    return '<div class="media-thumb" onclick="openMediaViewerItem('+n+','+idx+')" style="aspect-ratio:1">'+
       thumb+
       '<button class="del-media" onclick="deleteMedia(event,'+n+','+idx+')">✕</button>'+
     '</div>';
@@ -803,28 +859,50 @@ function renderMediaGrid(n){
 
 function deleteMedia(event, n, idx){
   event.stopPropagation();
-  currentHoleData[n-1].media.splice(idx, 1);
+  var item = currentHoleData[n-1].mediaItems[idx];
+  if(item && item.id) idbDelete(item.id);
+  currentHoleData[n-1].mediaItems.splice(idx, 1);
+  currentHoleData[n-1].mediaIds = currentHoleData[n-1].mediaItems.map(function(m){return m.id;});
   renderMediaGrid(n);
-  // メディアもコメントもなければボタン色を戻す
-  var hasAny = currentHoleData[n-1].comment.trim().length > 0 || (currentHoleData[n-1].media && currentHoleData[n-1].media.length > 0);
+  var hasAny = (currentHoleData[n-1].comment||'').trim().length > 0 || currentHoleData[n-1].mediaItems.length > 0;
   document.getElementById('hcmt-btn-'+n).classList.toggle('has-comment', hasAny);
 }
 
-function openMediaViewer(n, idx){
-  var item = currentHoleData[n-1].media[idx];
+function openMediaViewerItem(n, idx){
+  var item = currentHoleData[n-1].mediaItems[idx];
+  if(item) openMediaViewerData(item.type, item.data);
+}
+
+function openMediaViewerData(type, data){
   var content = document.getElementById('media-viewer-content');
-  if(item.type === 'video'){
-    content.innerHTML = '<video src="'+item.data+'" controls autoplay style="max-width:95vw;max-height:80vh;border-radius:10px"></video>';
+  if(type === 'video'){
+    content.innerHTML = '<video src="'+data+'" controls autoplay style="max-width:95vw;max-height:80vh;border-radius:10px"></video>';
   } else {
-    content.innerHTML = '<img src="'+item.data+'" style="max-width:95vw;max-height:80vh;border-radius:10px;object-fit:contain">';
+    content.innerHTML = '<img src="'+data+'" style="max-width:95vw;max-height:80vh;border-radius:10px;object-fit:contain">';
   }
   document.getElementById('media-viewer').classList.add('on');
 }
 
 function closeMediaViewer(){
-  var v = document.getElementById('media-viewer');
-  v.classList.remove('on');
+  document.getElementById('media-viewer').classList.remove('on');
   document.getElementById('media-viewer-content').innerHTML = '';
+}
+
+// ホール読み込み時にIndexedDBからメディアを復元
+function loadMediaForHole(holeData, n, cb){
+  var ids = holeData.mediaIds || [];
+  if(!ids.length){ holeData.mediaItems = []; cb(); return; }
+  var items = [], pending = ids.length;
+  ids.forEach(function(id, i){
+    idbGet(id, function(item){
+      items[i] = item;
+      pending--;
+      if(pending === 0){
+        holeData.mediaItems = items.filter(function(x){return x!==null;});
+        cb();
+      }
+    });
+  });
 }
 
 // 漢数字・数詞→数字変換
@@ -853,17 +931,22 @@ function onEmMediaSelected(n, input){
   var files = input.files;
   if(!files || !files.length) return;
   var file = files[0];
-  var limitMB = file.type.startsWith('video') ? 50 : 20;
+  var limitMB = file.type.startsWith('video') ? 200 : 50;
   if(file.size > limitMB * 1024 * 1024){
-    alert((file.type.startsWith('video') ? '動画は50MB' : '画像は20MB') + '以下にしてください');
+    alert((file.type.startsWith('video') ? '動画は200MB' : '画像は50MB') + '以下にしてください');
     input.value = ''; return;
   }
   var reader = new FileReader();
   reader.onload = function(e){
-    if(!window.emMedia) window.emMedia = {};
-    if(!window.emMedia[n]) window.emMedia[n] = [];
-    window.emMedia[n].push({ type: file.type.startsWith('video') ? 'video' : 'image', data: e.target.result, name: file.name });
-    renderEmMediaGrid(n);
+    var id = genMediaId();
+    var item = { id: id, type: file.type.startsWith('video') ? 'video' : 'image', data: e.target.result, name: file.name };
+    idbSave(item, function(){
+      if(!window.emMedia) window.emMedia = {};
+      if(!window.emMedia[n]) window.emMedia[n] = {ids:[], items:[]};
+      window.emMedia[n].ids.push(id);
+      window.emMedia[n].items.push(item);
+      renderEmMediaGrid(n);
+    });
   };
   reader.readAsDataURL(file);
   input.value = '';
@@ -872,21 +955,27 @@ function onEmMediaSelected(n, input){
 function renderEmMediaGrid(n){
   var grid = document.getElementById('em-media-grid-'+n);
   if(!grid) return;
-  var items = (window.emMedia && window.emMedia[n]) ? window.emMedia[n] : [];
+  var em = window.emMedia && window.emMedia[n];
+  var items = em ? em.items : [];
   if(!items.length){ grid.innerHTML = ''; return; }
   grid.innerHTML = items.map(function(item, idx){
     var thumb = item.type === 'video'
       ? '<video src="'+item.data+'" muted playsinline style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e8e8e0"></video>'
       : '<img src="'+item.data+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e8e8e0">';
     return '<div style="position:relative;display:inline-block">'+
-      '<div onclick="openDetailMedia(\''+item.type+'\',\''+item.data+'\')">'+thumb+'</div>'+
+      '<div onclick="openMediaViewerData(\''+item.type+'\',\''+item.data+'\')">'+thumb+'</div>'+
       '<button onclick="deleteEmMedia('+n+','+idx+')" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;font-size:10px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">✕</button>'+
     '</div>';
   }).join('');
 }
 
 function deleteEmMedia(n, idx){
-  if(window.emMedia && window.emMedia[n]) window.emMedia[n].splice(idx, 1);
+  var em = window.emMedia && window.emMedia[n];
+  if(!em) return;
+  var item = em.items[idx];
+  if(item && item.id) idbDelete(item.id);
+  em.items.splice(idx, 1);
+  em.ids.splice(idx, 1);
   renderEmMediaGrid(n);
 }
 
@@ -1007,7 +1096,8 @@ function saveAll(){
     if(pv) currentHoleData[i-1].putts=parseInt(pv);
     currentHoleData[i-1].ob=obv?parseInt(obv):0;
     currentHoleData[i-1].comment=cv?cv.trim():'';
-    currentHoleData[i-1].media=currentHoleData[i-1].media||[];
+    currentHoleData[i-1].mediaItems=currentHoleData[i-1].mediaItems||[];
+    currentHoleData[i-1].mediaIds=currentHoleData[i-1].mediaItems.map(function(m){return m.id;});
   }
   var filled=currentHoleData.filter(function(h){return h.score!==null;}).length;
   if(filled===0){ alert('少なくとも1ホール入力してください'); return; }
@@ -1020,7 +1110,7 @@ function saveAll(){
   var holes=currentHoleData.map(function(h){
     if(h.score!==null) totalScore+=h.score;
     if(h.putts!==null){totalPutts+=h.putts;hasPutts=true;}
-    return{par:h.par||4,score:h.score,putts:h.putts,ob:h.ob||0,comment:h.comment||'',media:h.media||[]};
+    return{par:h.par||4,score:h.score,putts:h.putts,ob:h.ob||0,comment:h.comment||'',mediaIds:h.mediaIds||[]};
   });
   var weatherSnap=null;
   if(lastWeather){var c=lastWeather.current,wi=wmoInfo(c.weather_code);weatherSnap={icon:wi.icon,label:wi.label,temp:Math.round(c.temperature_2m),wind:Math.round(c.wind_speed_10m),humid:Math.round(c.relative_humidity_2m)};}
@@ -1106,10 +1196,9 @@ function openEdit(id){
     var ob=r.holes[i]&&r.holes[i].ob?r.holes[i].ob:'';
     var hp=r.holes[i]&&r.holes[i].par?r.holes[i].par:4;
     var cmt=r.holes[i]&&r.holes[i].comment?r.holes[i].comment:'';
-    var existingMedia=r.holes[i]&&r.holes[i].media?r.holes[i].media:[];
-    // 編集中メディアをグローバルに保持
+    var existingMediaIds=r.holes[i]&&r.holes[i].mediaIds?r.holes[i].mediaIds:[];
     if(!window.emMedia) window.emMedia={};
-    window.emMedia[n]=existingMedia.slice();
+    window.emMedia[n]={ids:existingMediaIds.slice(), items:[]};
     html+='<div style="margin-bottom:8px;padding:10px;background:#f9f9f6;border:1px solid #e8e8e0;border-radius:10px">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
         '<div style="font-size:12px;font-weight:600;color:#555">'+n+'ホール</div>'+
@@ -1134,8 +1223,20 @@ function openEdit(id){
     '</div>';
   }
   document.getElementById('em-holes').innerHTML=html;
-  // 既存メディアをグリッドに描画
-  for(var j=1;j<=18;j++) renderEmMediaGrid(j);
+  // 既存メディアをIndexedDBから非同期ロード
+  for(var j=1;j<=18;j++){
+    (function(n){
+      var em=window.emMedia[n];
+      if(!em||!em.ids||!em.ids.length) return;
+      em.ids.forEach(function(id){
+        idbGet(id,function(item){
+          if(!item) return;
+          em.items.push(item);
+          renderEmMediaGrid(n);
+        });
+      });
+    })(j);
+  }
   document.getElementById('edit-modal').classList.add('on');
 }
 
@@ -1174,15 +1275,8 @@ function openDetail(id){
     var parLabel='<span style="font-size:11px;color:#888;margin-left:auto">Par '+(h.par||4)+'</span>';
     var comment=h.comment?'<div class="detail-hole-comment">'+h.comment+'</div>':'';
     var mediaHtml='';
-    if(h.media&&h.media.length){
-      mediaHtml='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">'+
-        h.media.map(function(item,mi){
-          var thumb=item.type==='video'
-            ?'<video src="'+item.data+'" muted playsinline style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e8e8e0;cursor:pointer" onclick="openDetailMedia(\''+item.type+'\',\''+item.data+'\')"></video>'
-            :'<img src="'+item.data+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e8e8e0;cursor:pointer" onclick="openDetailMedia(\''+item.type+'\',\''+item.data+'\')">';
-          return thumb;
-        }).join('')+
-      '</div>';
+    if(h.mediaIds&&h.mediaIds.length){
+      mediaHtml='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px" id="dm-media-'+i+'"></div>';
     }
     html+='<div class="detail-hole-row">'+
       '<div class="detail-hole-num '+numCls+'">'+n+'</div>'+
@@ -1194,52 +1288,67 @@ function openDetail(id){
   });
   document.getElementById('dm-holes').innerHTML=html;
   document.getElementById('detail-modal').classList.add('on');
+  // IndexedDBからメディアを非同期ロード
+  r.holes.forEach(function(h,i){
+    if(!h.mediaIds||!h.mediaIds.length) return;
+    var container=document.getElementById('dm-media-'+i);
+    if(!container) return;
+    h.mediaIds.forEach(function(id){
+      idbGet(id,function(item){
+        if(!item||!container) return;
+        var el=document.createElement(item.type==='video'?'video':'img');
+        el.src=item.data;
+        el.style.cssText='width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e8e8e0;cursor:pointer';
+        if(item.type==='video'){el.muted=true;el.playsInline=true;}
+        el.onclick=function(){openMediaViewerData(item.type,item.data);};
+        container.appendChild(el);
+      });
+    });
+  });
 }
 
 function closeDetailModal(){ document.getElementById('detail-modal').classList.remove('on'); }
-
-function openDetailMedia(type, data){
-  var content = document.getElementById('media-viewer-content');
-  if(type === 'video'){
-    content.innerHTML = '<video src="'+data+'" controls autoplay style="max-width:95vw;max-height:80vh;border-radius:10px"></video>';
-  } else {
-    content.innerHTML = '<img src="'+data+'" style="max-width:95vw;max-height:80vh;border-radius:10px;object-fit:contain">';
-  }
-  document.getElementById('media-viewer').classList.add('on');
-}
+function openDetailMedia(type, data){ openMediaViewerData(type, data); }
 
 function saveEdit(){
-  var idx=records.findIndex(function(x){return x.id===editingId;});
-  if(idx===-1)return;
-  var r=records[idx];
-  r.roundName=document.getElementById('em-round').value.trim()||'';
-  r.course=document.getElementById('em-course').value.trim()||'名称未設定';
-  r.date=document.getElementById('em-date').value;
-  r.par=parseInt(document.getElementById('em-par').value);
-  var total=0,filled=0,totalPutts=0,hasPutts=false;
-  var holes=[];
-  for(var i=1;i<=18;i++){
-    var sv=document.getElementById('em-s-'+i).value;
-    var pv=document.getElementById('em-p-'+i).value;
-    var obv=document.getElementById('em-ob-'+i).value;
-    var hpv=document.getElementById('em-par-'+i);
-    var cmtv=document.getElementById('em-cmt-'+i);
-    var score=sv?parseInt(sv):null;
-    var putts=pv?parseInt(pv):null;
-    var ob=obv?parseInt(obv):0;
-    var hp=hpv?parseInt(hpv.value):4;
-    var cmt=cmtv?cmtv.value.trim():'';
-    var media=(window.emMedia&&window.emMedia[i])?window.emMedia[i]:[];
-    holes.push({par:hp,score:score,putts:putts,ob:ob,comment:cmt,media:media});
-    if(score!==null){total+=score;filled++;}
-    if(putts!==null){totalPutts+=putts;hasPutts=true;}
+  try{
+    var idx=records.findIndex(function(x){return x.id===editingId;});
+    if(idx===-1){ closeModal(); return; }
+    var r=records[idx];
+    r.roundName=(document.getElementById('em-round')||{value:''}).value.trim()||'';
+    r.course=(document.getElementById('em-course')||{value:'名称未設定'}).value.trim()||'名称未設定';
+    r.date=(document.getElementById('em-date')||{value:fmtDate()}).value||fmtDate();
+    var parEl=document.getElementById('em-par');
+    var total=0,filled=0,totalPutts=0,hasPutts=false;
+    var holes=[];
+    for(var i=1;i<=18;i++){
+      var svEl=document.getElementById('em-s-'+i);
+      var pvEl=document.getElementById('em-p-'+i);
+      var obvEl=document.getElementById('em-ob-'+i);
+      var hpvEl=document.getElementById('em-par-'+i);
+      var cmtvEl=document.getElementById('em-cmt-'+i);
+      var score=svEl&&svEl.value?parseInt(svEl.value):null;
+      var putts=pvEl&&pvEl.value?parseInt(pvEl.value):null;
+      var ob=obvEl&&obvEl.value?parseInt(obvEl.value):0;
+      var hp=hpvEl&&hpvEl.value?parseInt(hpvEl.value):4;
+      var cmt=cmtvEl?cmtvEl.value.trim():'';
+      var em=window.emMedia&&window.emMedia[i];
+      var mediaIds=em?em.ids:[];
+      holes.push({par:hp,score:score,putts:putts,ob:ob,comment:cmt,mediaIds:mediaIds});
+      if(score!==null){total+=score;filled++;}
+      if(putts!==null){totalPutts+=putts;hasPutts=true;}
+    }
+    r.holes=holes; r.total=total; r.filled=filled;
+    r.totalPutts=hasPutts?totalPutts:null;
+    r.par=holes.reduce(function(a,h){return a+(h.par||4);},0);
+    records[idx]=r;
+    persist();
+  }catch(e){
+    console.error('saveEdit error:', e);
+  }finally{
+    closeModal();
+    renderList();
   }
-  r.holes=holes; r.total=total; r.filled=filled;
-  r.totalPutts=hasPutts?totalPutts:null;
-  // ホール別パーの合計でコースパーを再計算
-  r.par=holes.reduce(function(a,h){return a+(h.par||4);},0);
-  records[idx]=r;
-  persist(); closeModal(); renderList();
 }
 
 function deleteRecord(id){
@@ -1587,13 +1696,15 @@ function initGoal(){
   }
 }
 
-initHoleData();
-buildHoles();
-document.getElementById('f-date').value=fmtDate();
-updateTotals();
-renderList();
-initOnboard();
-initGoal();
+initIDB(function(){
+  initHoleData();
+  buildHoles();
+  document.getElementById('f-date').value=fmtDate();
+  updateTotals();
+  renderList();
+  initOnboard();
+  initGoal();
+});
 </script>
 </body>
 </html>
