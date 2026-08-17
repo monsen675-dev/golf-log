@@ -907,12 +907,12 @@ function runAnalysis(rawUrl, resultEl, onSuccess){
 
   var videoUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + key, {
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ parts: [{ text: SWING_PROMPT }, { file_data: { mime_type: 'video/mp4', file_uri: videoUrl } }] }] })
   }).then(function(r){ return r.json(); }).then(function(data){
     if(data.error){
-      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + key, {
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: SWING_PROMPT + '\n\n動画URL: ' + rawUrl + '\n\n※動画を直接参照できない場合は、一般的なゴルフスイング改善のアドバイスを提供してください。' }] }] })
       }).then(function(r){ return r.json(); });
@@ -1676,7 +1676,7 @@ function analyzeRound(){
     '6. 【一言メッセージ】励ましや前向きなアドバイスを一言\n\n'+
     '各項目を簡潔にまとめてください。';
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+key, {
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+key, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
   }).then(function(r){ return r.json(); }).then(function(data){
@@ -1904,7 +1904,7 @@ function analyzeGrowth(){
     '6. 【コーチから一言】このゴルファーへの励ましとアドバイス\n\n'+
     '全体を通じた客観的な視点で、具体的に分析してください。';
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+key, {
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+key, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
   }).then(function(r){ return r.json(); }).then(function(data){
