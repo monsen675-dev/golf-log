@@ -156,7 +156,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 /* media viewer */
 .media-viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:200;align-items:center;justify-content:center;flex-direction:column}
 .media-viewer.on{display:flex}
-.media-viewer img,.media-viewer video{max-width:90vw;max-height:85vh;border-radius:10px;object-fit:contain;width:auto;height:auto}
+.media-viewer img,.media-viewer video{max-width:90vw;max-height:85vh;border-radius:10px;object-fit:contain;width:90vw;height:auto}
 .media-viewer-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none}
 /* preload iframe container */
 #preload-container{position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;overflow:hidden;z-index:-1}
@@ -883,13 +883,47 @@ function initApiKey(){
 }
 
 // ---- Swing Analysis (共通コア) ----
-var SWING_PROMPT = 'あなたはプロのゴルフコーチです。このゴルフスイング動画を分析して、以下の項目を日本語で端的に教えてください。\n\n' +
-  '1. 【飛距離の推定】スイングスピードや体の使い方から推定される飛距離\n' +
-  '2. 【ボールの軌道】フェード・ドロー・スライス・フックなど\n' +
-  '3. 【良い点】2〜3点\n' +
-  '4. 【改善点】2〜3点\n' +
-  '5. 【アドバイス】最も重要な1つのアドバイス\n\n' +
-  '各項目を短く箇条書きで答えてください。';
+var SWING_PROMPT = 'あなたは日本トッププロのゴルフコーチです。この動画を最初から最後まで、コマ単位で細かく分析してください。\n\n' +
+  '以下の各フェーズを順番に詳しく評価してください：\n\n' +
+  '【アドレス】\n' +
+  '・スタンス幅、足の向き、体重配分\n' +
+  '・グリップの握り方、ハンドポジション\n' +
+  '・姿勢（前傾角度、背中の状態）\n' +
+  '・ボールとの距離感\n\n' +
+  '【テイクバック】\n' +
+  '・クラブの軌道（インサイド/アウトサイド）\n' +
+  '・左腕の伸び、肘の状態\n' +
+  '・肩の回転量、腰の回転\n' +
+  '・体重移動のタイミング\n\n' +
+  '【トップ】\n' +
+  '・クラブフェースの向き（スクエア/オープン/クローズ）\n' +
+  '・左腕の角度、コックの深さ\n' +
+  '・肩の回転角度（理想は90度以上）\n' +
+  '・頭の位置、軸のブレ\n\n' +
+  '【ダウンスイング】\n' +
+  '・切り返しのタイミング\n' +
+  '・下半身リード（腰→肩→腕の順）の有無\n' +
+  '・クラブの軌道（ループの有無）\n' +
+  '・右肘の使い方、タメの維持\n\n' +
+  '【インパクト】\n' +
+  '・フェースの向き、スクエアかどうか\n' +
+  '・手元の位置（ハンドファーストかどうか）\n' +
+  '・体重移動（左足への乗り方）\n' +
+  '・頭の位置、目線\n\n' +
+  '【フォロースルー〜フィニッシュ】\n' +
+  '・クラブの抜け方、方向性\n' +
+  '・左肘の状態\n' +
+  '・体の回転、フィニッシュの形\n' +
+  '・バランスと軸の安定性\n\n' +
+  '---\n\n' +
+  '上記の分析を踏まえて、以下をまとめてください：\n\n' +
+  '1. 【飛距離の推定】スイングスピードや体の使い方から推定\n' +
+  '2. 【ボールの軌道予測】フェード・ドロー・スライス・フックなど\n' +
+  '3. 【このスイングの強み】具体的に2〜3点\n' +
+  '4. 【最優先の改善ポイント】最も重要な課題を2〜3点、具体的に\n' +
+  '5. 【今日から実践できる練習法】課題に対する具体的な練習方法\n' +
+  '6. 【総合評価】100点満点でのスコアと一言コメント\n\n' +
+  '動画全体をしっかり確認した上で、具体的かつ詳細に答えてください。';
 
 function formatAnalysisHtml(text){
   return text
@@ -966,8 +1000,18 @@ function runAnalysis(rawUrl, resultEl, onSuccess){
       body: JSON.stringify({
         contents:[{parts:[
           {text: SWING_PROMPT},
-          {file_data:{mime_type: mimeType, file_uri: fileUri}}
-        ]}]
+          {file_data:{
+            mime_type: mimeType,
+            file_uri: fileUri
+          }}
+        ]}],
+        generationConfig:{
+          maxOutputTokens: 4096,
+          temperature: 0.2
+        },
+        videoMetadata:{
+          fps: 10
+        }
       })
     }).then(function(r){ return r.json(); }).then(function(data){
       // Step4: アップロードしたファイルを削除（48時間以内に自動削除されるが念のため）
@@ -1092,11 +1136,11 @@ function openVideoUrl(embedUrl){
   var existing = preloadedIframes[embedUrl];
   if(existing){
     var iframe = existing.cloneNode(false);
-    iframe.style.cssText = 'width:min(90vw,400px);height:min(160vw,85vh);border:none;border-radius:10px';
+    iframe.style.cssText = 'width:90vw;max-width:400px;height:160vw;max-height:85vh;border:none;border-radius:10px';
     iframe.allowFullscreen = true;
     content.appendChild(iframe);
   } else {
-    content.innerHTML = '<iframe src="'+embedUrl+'" style="width:min(90vw,400px);height:min(160vw,85vh);border:none;border-radius:10px" allowfullscreen></iframe>';
+    content.innerHTML = '<iframe src="'+embedUrl+'" style="width:90vw;max-width:400px;height:160vw;max-height:85vh;border:none;border-radius:10px" allowfullscreen></iframe>';
   }
   document.getElementById('media-viewer').classList.add('on');
 }
@@ -1165,7 +1209,7 @@ function openMediaViewerItem(n, idx){
 function openMediaViewerData(type, data){
   var content = document.getElementById('media-viewer-content');
   if(type === 'video'){
-    content.innerHTML = '<video src="'+data+'" controls autoplay style="max-height:85vh;max-width:90vw;width:auto;height:auto;border-radius:10px;object-fit:contain" playsinline></video>';
+    content.innerHTML = '<video src="'+data+'" controls autoplay style="width:90vw;max-height:85vh;border-radius:10px;object-fit:contain;display:block" playsinline></video>';
   } else {
     content.innerHTML = '<img src="'+data+'" style="max-width:90vw;max-height:85vh;border-radius:10px;object-fit:contain">';
   }
