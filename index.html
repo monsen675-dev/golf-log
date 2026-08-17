@@ -156,8 +156,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 /* media viewer */
 .media-viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:200;align-items:center;justify-content:center;flex-direction:column}
 .media-viewer.on{display:flex}
-.media-viewer img,.media-viewer video{max-width:95vw;max-height:80vh;border-radius:10px;object-fit:contain}
+.media-viewer img,.media-viewer video{max-width:90vw;max-height:85vh;border-radius:10px;object-fit:contain;width:auto;height:auto}
 .media-viewer-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none}
+/* preload iframe container */
+#preload-container{position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;overflow:hidden;z-index:-1}
 .modal-title{font-size:16px;font-weight:600;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #ebebeb;display:flex;justify-content:space-between;align-items:center}
 .modal-close{font-size:20px;color:#aaa;cursor:pointer;padding:0 4px}
 /* detail modal */
@@ -335,15 +337,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <!-- データ管理 -->
 <div id="s-data" class="sec">
   <div class="card">
-    <div class="card-title">🤖 スイング解析 API設定</div>
-    <p style="font-size:13px;color:#555;margin-bottom:12px;line-height:1.6">Google AI StudioのGemini APIキーを入力すると、動画URLからスイングを自動解析できます。</p>
-    <div class="field" style="margin-bottom:8px">
-      <label>Gemini APIキー</label>
-      <input type="password" id="gemini-api-key" placeholder="AIza..." oninput="saveApiKey()" autocomplete="off" style="font-size:13px">
-    </div>
-    <div id="api-key-status" style="font-size:12px;min-height:16px"></div>
-  </div>
-  <div class="card">
     <div class="card-title">目標スコア設定</div>
     <p style="font-size:13px;color:#555;margin-bottom:12px;line-height:1.6">目標スコアを設定すると統計グラフに目標ラインが表示されます。</p>
     <div style="display:flex;gap:10px;align-items:flex-end">
@@ -354,6 +347,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div style="padding-bottom:2px;font-size:13px;color:#888">打</div>
     </div>
     <div id="goal-msg" style="margin-top:8px;font-size:12px;color:#0F6E56;min-height:18px"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">🤖 スイング解析 API設定</div>
+    <p style="font-size:13px;color:#555;margin-bottom:12px;line-height:1.6">Google AI StudioのGemini APIキーを入力すると、動画URLからスイングを自動解析できます。</p>
+    <div class="field" style="margin-bottom:8px">
+      <label>Gemini APIキー</label>
+      <input type="password" id="gemini-api-key" placeholder="AIza..." oninput="saveApiKey()" autocomplete="off" style="font-size:13px">
+    </div>
+    <div id="api-key-status" style="font-size:12px;min-height:16px"></div>
   </div>
   <div class="card">
     <div class="card-title">データのバックアップ</div>
@@ -417,11 +419,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="modal-title"><span id="dm-title">ラウンド詳細</span><span class="modal-close" onclick="closeDetailModal()">✕</span></div>
     <div id="dm-meta" style="font-size:12px;color:#888;margin-bottom:12px"></div>
     <div class="detail-summary-bar" id="dm-summary"></div>
-    <button class="btn-save-all" id="dm-ai-btn" onclick="analyzeRound()" style="width:100%;margin-bottom:12px;background:#378ADD;display:flex;align-items:center;justify-content:center;gap:6px">
+    <div id="dm-holes"></div>
+    <button class="btn-save-all" id="dm-ai-btn" onclick="analyzeRound()" style="width:100%;margin-top:14px;margin-bottom:12px;background:#378ADD;display:flex;align-items:center;justify-content:center;gap:6px">
       🤖 AIでラウンド全体を総評する
     </button>
     <div id="dm-ai-result" style="display:none;background:#f0f8ff;border:1px solid #B5D4F4;border-radius:12px;padding:14px;margin-bottom:14px;font-size:13px;color:#1a1a1a;line-height:1.8"></div>
-    <div id="dm-holes"></div>
   </div>
 </div>
 
@@ -450,6 +452,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
   </div>
 </div>
+
+<!-- プリロード用コンテナ -->
+<div id="preload-container"></div>
 
 <!-- メディアビューア -->
 <div class="media-viewer" id="media-viewer" onclick="closeMediaViewer()">
@@ -893,38 +898,93 @@ function formatAnalysisHtml(text){
     .replace(/\n/g, '<br>');
 }
 
+function translateGeminiError(msg){
+  if(!msg) return '解析に失敗しました';
+  if(msg.indexOf('high demand') > -1 || msg.indexOf('RESOURCE_EXHAUSTED') > -1)
+    return 'サーバーが混雑しています。数分後にもう一度お試しください。';
+  if(msg.indexOf('API key') > -1 || msg.indexOf('API_KEY') > -1 || msg.indexOf('not valid') > -1)
+    return 'APIキーが正しくありません。データタブで確認してください。';
+  if(msg.indexOf('not found') > -1 || msg.indexOf('not supported') > -1 || msg.indexOf('no longer available') > -1)
+    return 'モデルが利用できません。アプリを最新版に更新してください。';
+  if(msg.indexOf('quota') > -1 || msg.indexOf('QUOTA') > -1)
+    return '無料枠の上限に達しました。しばらく時間をおいてお試しください。';
+  if(msg.indexOf('permission') > -1 || msg.indexOf('PERMISSION') > -1)
+    return 'APIキーの権限が不足しています。Google AI Studioで確認してください。';
+  if(msg.indexOf('network') > -1 || msg.indexOf('Failed to fetch') > -1)
+    return 'ネットワークエラーです。通信状況を確認してください。';
+  return '解析に失敗しました（'+msg+'）';
+}
+
 function runAnalysis(rawUrl, resultEl, onSuccess){
   var key = localStorage.getItem('golflog_gemini_key');
   if(!key){ alert('データタブでGemini APIキーを設定してください'); return; }
   resultEl.style.display = 'block';
-  resultEl.innerHTML = '<span class="spin">↻</span> 解析中...（10〜30秒かかります）';
 
+  // GoogleドライブのファイルIDを取得
   var fileId = null;
   var m = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
   if(m) fileId = m[1];
   if(!fileId){ m = rawUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/); if(m) fileId = m[1]; }
   if(!fileId){ resultEl.innerHTML = '⚠️ GoogleドライブのURLを正しく入力してください'; return; }
 
-  var videoUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
+  var downloadUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=' + key, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: SWING_PROMPT }, { file_data: { mime_type: 'video/mp4', file_uri: videoUrl } }] }] })
-  }).then(function(r){ return r.json(); }).then(function(data){
-    if(data.error){
-      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=' + key, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: SWING_PROMPT + '\n\n動画URL: ' + rawUrl + '\n\n※動画を直接参照できない場合は、一般的なゴルフスイング改善のアドバイスを提供してください。' }] }] })
-      }).then(function(r){ return r.json(); });
+  // Step1: GoogleDriveから動画をダウンロード
+  resultEl.innerHTML = '<span class="spin">↻</span> ①動画をダウンロード中...';
+  fetch(downloadUrl)
+  .then(function(r){
+    if(!r.ok) throw new Error('Googleドライブからダウンロードできませんでした。共有設定を「リンクを知っている全員が閲覧可」にしてください。');
+    return r.blob();
+  })
+  .then(function(blob){
+    // Step2: Gemini File APIにアップロード
+    resultEl.innerHTML = '<span class="spin">↻</span> ②AIサーバーにアップロード中...（動画サイズによって1〜2分かかります）';
+    var mimeType = blob.type || 'video/mp4';
+    return fetch('https://generativelanguage.googleapis.com/upload/v1beta/files?key='+key, {
+      method: 'POST',
+      headers: {
+        'X-Goog-Upload-Command': 'start, upload, finalize',
+        'X-Goog-Upload-Header-Content-Type': mimeType,
+        'X-Goog-Upload-Header-Content-Length': blob.size,
+        'Content-Type': mimeType
+      },
+      body: blob
+    }).then(function(r){ return r.json(); });
+  })
+  .then(function(uploadData){
+    if(!uploadData.file || !uploadData.file.uri){
+      throw new Error('アップロードに失敗しました: '+(uploadData.error&&uploadData.error.message||JSON.stringify(uploadData)));
     }
-    return data;
-  }).then(function(data){
-    if(data.error){ resultEl.innerHTML = '⚠️ エラー: ' + (data.error.message||'解析に失敗しました') + '<br><small style="color:#aaa">APIキーを確認してください</small>'; return; }
-    var text = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '解析結果を取得できませんでした';
+    var fileUri = uploadData.file.uri;
+    var mimeType = uploadData.file.mimeType || 'video/mp4';
+    resultEl.innerHTML = '<span class="spin">↻</span> ③Geminiが動画を解析中...（10〜30秒かかります）';
+
+    // Step3: Geminiで解析
+    return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+key, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        contents:[{parts:[
+          {text: SWING_PROMPT},
+          {file_data:{mime_type: mimeType, file_uri: fileUri}}
+        ]}]
+      })
+    }).then(function(r){ return r.json(); }).then(function(data){
+      // Step4: アップロードしたファイルを削除（48時間以内に自動削除されるが念のため）
+      var fileName = fileUri.split('/').pop();
+      fetch('https://generativelanguage.googleapis.com/v1beta/files/'+fileName+'?key='+key, {method:'DELETE'}).catch(function(){});
+      return data;
+    });
+  })
+  .then(function(data){
+    if(data.error){ resultEl.innerHTML = '⚠️ ' + translateGeminiError(data.error.message); return; }
+    var text = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0]
+      ? data.candidates[0].content.parts[0].text : '解析結果を取得できませんでした';
     resultEl.innerHTML = formatAnalysisHtml(text);
     onSuccess(text);
-  }).catch(function(err){
-    resultEl.innerHTML = '⚠️ 通信エラーが発生しました。ネットワークを確認してください。<br><small>' + err.message + '</small>';
+  })
+  .catch(function(err){
+    resultEl.innerHTML = '⚠️ ' + (err.message.indexOf('ダウンロード') > -1 ? err.message : translateGeminiError(err.message));
   });
 }
 
@@ -987,6 +1047,8 @@ function renderUrlList(n){
   if(!el) return;
   var urls = currentHoleData[n-1].videoUrls || [];
   if(!urls.length){ el.innerHTML=''; return; }
+  // プリロード開始
+  urls.forEach(function(u){ preloadVideoUrl(u.embed); });
   el.innerHTML = urls.map(function(u, idx){
     return '<div class="video-link-thumb" style="flex-direction:column;align-items:stretch;gap:6px">'+
       '<div style="display:flex;align-items:center;gap:8px">'+
@@ -1010,9 +1072,32 @@ function deleteVideoUrl(event, n, idx){
   document.getElementById('hcmt-btn-'+n).classList.toggle('has-comment', hasAny);
 }
 
+// プリロード済みiframeを管理
+var preloadedIframes = {};
+
+function preloadVideoUrl(embedUrl){
+  if(preloadedIframes[embedUrl]) return; // 既にプリロード済み
+  var iframe = document.createElement('iframe');
+  iframe.src = embedUrl;
+  iframe.style.cssText = 'width:1px;height:1px;border:none;opacity:0';
+  iframe.setAttribute('data-embed', embedUrl);
+  document.getElementById('preload-container').appendChild(iframe);
+  preloadedIframes[embedUrl] = iframe;
+}
+
 function openVideoUrl(embedUrl){
   var content = document.getElementById('media-viewer-content');
-  content.innerHTML = '<iframe src="'+embedUrl+'" style="width:95vw;height:60vw;max-height:80vh;border:none;border-radius:10px" allowfullscreen></iframe>';
+  content.innerHTML = '';
+  // プリロード済みiframeがあればそれを使う
+  var existing = preloadedIframes[embedUrl];
+  if(existing){
+    var iframe = existing.cloneNode(false);
+    iframe.style.cssText = 'width:min(90vw,400px);height:min(160vw,85vh);border:none;border-radius:10px';
+    iframe.allowFullscreen = true;
+    content.appendChild(iframe);
+  } else {
+    content.innerHTML = '<iframe src="'+embedUrl+'" style="width:min(90vw,400px);height:min(160vw,85vh);border:none;border-radius:10px" allowfullscreen></iframe>';
+  }
   document.getElementById('media-viewer').classList.add('on');
 }
 function triggerMediaPicker(n){
@@ -1080,9 +1165,9 @@ function openMediaViewerItem(n, idx){
 function openMediaViewerData(type, data){
   var content = document.getElementById('media-viewer-content');
   if(type === 'video'){
-    content.innerHTML = '<video src="'+data+'" controls autoplay style="max-width:95vw;max-height:80vh;border-radius:10px"></video>';
+    content.innerHTML = '<video src="'+data+'" controls autoplay style="max-height:85vh;max-width:90vw;width:auto;height:auto;border-radius:10px;object-fit:contain" playsinline></video>';
   } else {
-    content.innerHTML = '<img src="'+data+'" style="max-width:95vw;max-height:80vh;border-radius:10px;object-fit:contain">';
+    content.innerHTML = '<img src="'+data+'" style="max-width:90vw;max-height:85vh;border-radius:10px;object-fit:contain">';
   }
   document.getElementById('media-viewer').classList.add('on');
 }
@@ -1222,8 +1307,8 @@ function renderEmUrlList(n){
       '<div style="display:flex;align-items:center;gap:8px">'+
         '<span class="video-link-icon" onclick="openVideoUrl(\''+u.embed+'\')" style="cursor:pointer">▶️</span>'+
         '<span class="video-link-label" onclick="openVideoUrl(\''+u.embed+'\')" style="cursor:pointer">動画 '+(idx+1)+'</span>'+
-        '<button class="media-btn" style="flex:none;padding:4px 8px;font-size:11px;background:#EAF3DE;border-color:#C0DD97;color:#27500A" onclick="analyzeSwingEm('+n+','+idx+')">🏌️ 解析</button>'+
-        '<button class="video-link-del" onclick="deleteEmVideoUrl('+n+','+idx+')">✕</button>'+
+        '<button class="media-btn" style="flex:none;padding:4px 8px;font-size:11px;background:#EAF3DE;border-color:#C0DD97;color:#27500A" onclick="event.stopPropagation();analyzeSwingEm('+n+','+idx+')">🏌️ 解析</button>'+
+        '<button class="video-link-del" onclick="event.stopPropagation();deleteEmVideoUrl('+n+','+idx+')">✕</button>'+
       '</div>'+
       '<div id="'+analysisId+'" style="'+(u.analysis?'':'display:none;')+'font-size:11px;color:#1a1a1a;line-height:1.6;background:#fff;border-radius:6px;padding:6px 8px;border:1px solid #e0e0d8;margin-top:4px">'+
         (u.analysis ? u.analysis.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/【(.*?)】/g,'<span style="font-weight:600;color:#0C447C">【$1】</span>').replace(/\n/g,'<br>') : '')+
@@ -1572,6 +1657,8 @@ function openDetail(id){
     }
     var videoUrlHtml='';
     if(h.videoUrls&&h.videoUrls.length){
+      // プリロード開始
+      h.videoUrls.forEach(function(u){ preloadVideoUrl(u.embed); });
       videoUrlHtml='<div style="margin-top:6px">'+h.videoUrls.map(function(u,vi){
         var analysisHtml = u.analysis ?
           '<div style="font-size:11px;color:#555;line-height:1.6;background:#fff;border-radius:6px;padding:6px 8px;border:1px solid #e0e0d8;margin-top:4px">'+
@@ -1682,7 +1769,7 @@ function analyzeRound(){
   }).then(function(r){ return r.json(); }).then(function(data){
     btn.disabled = false;
     btn.innerHTML = '🔄 AIで再総評する';
-    if(data.error){ resultEl.innerHTML = '⚠️ エラー: '+(data.error.message||'解析に失敗しました')+'<br><small style="color:#aaa">APIキーを確認してください</small>'; return; }
+    if(data.error){ resultEl.innerHTML = '⚠️ '+translateGeminiError(data.error.message); return; }
     var text = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '総評を取得できませんでした';
     resultEl.innerHTML = formatAnalysisHtml(text);
     // 総評を記録に保存
@@ -1691,6 +1778,7 @@ function analyzeRound(){
   }).catch(function(err){
     btn.disabled = false;
     btn.innerHTML = '🤖 AIでラウンド全体を総評する';
+    resultEl.innerHTML = '⚠️ '+translateGeminiError(err.message);
     resultEl.innerHTML = '⚠️ 通信エラー: '+err.message;
   });
 }
@@ -1847,9 +1935,9 @@ function makeGrowthCard(){
   var cachedReview = localStorage.getItem('golflog_growth_review');
   var cachedAt = localStorage.getItem('golflog_growth_review_at');
   var reviewHtml = cachedReview ?
-    '<div id="growth-result" style="font-size:13px;color:#1a1a1a;line-height:1.8;margin-top:10px">'+formatAnalysisHtml(cachedReview)+'</div>'+
+    '<div id="growth-result" style="font-size:13px;color:#1a1a1a;line-height:1.8;margin-top:10px;text-align:left">'+formatAnalysisHtml(cachedReview)+'</div>'+
     '<div style="font-size:10px;color:#aaa;margin-top:6px;text-align:right">最終更新: '+(cachedAt||'')+'</div>' :
-    '<div id="growth-result" style="font-size:13px;color:#aaa;margin-top:10px;text-align:center">ボタンを押すと分析します</div>';
+    '<div id="growth-result" style="font-size:13px;color:#aaa;margin-top:10px;text-align:left">ボタンを押すと分析します</div>';
 
   return '<div class="chart-wrap" style="margin-top:10px">'+
     '<div class="chart-lbl">🤖 AI成長分析</div>'+
@@ -1910,17 +1998,17 @@ function analyzeGrowth(){
   }).then(function(r){ return r.json(); }).then(function(data){
     if(btn){ btn.disabled=false; btn.innerHTML='🔄 再分析する'; }
     if(data.error){
-      if(resultEl) resultEl.innerHTML='⚠️ エラー: '+(data.error.message||'失敗')+'<br><small>APIキーを確認してください</small>';
+      if(resultEl) resultEl.innerHTML='⚠️ '+translateGeminiError(data.error.message);
       return;
     }
     var text = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '分析結果を取得できませんでした';
-    if(resultEl) resultEl.innerHTML = formatAnalysisHtml(text);
+    if(resultEl){ resultEl.style.textAlign='left'; resultEl.style.color='#1a1a1a'; resultEl.innerHTML = formatAnalysisHtml(text); }
     // 結果をキャッシュ保存
     localStorage.setItem('golflog_growth_review', text);
     localStorage.setItem('golflog_growth_review_at', fmtDate().replace(/-/g,'/'));
   }).catch(function(err){
     if(btn){ btn.disabled=false; btn.innerHTML='📈 成長の変化と現在の状態を分析する'; }
-    if(resultEl) resultEl.innerHTML='⚠️ 通信エラー: '+err.message;
+    if(resultEl) resultEl.innerHTML='⚠️ '+translateGeminiError(err.message);
   });
 }
 
