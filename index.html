@@ -156,8 +156,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 /* media viewer */
 .media-viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:200;align-items:center;justify-content:center;flex-direction:column}
 .media-viewer.on{display:flex}
-.media-viewer img,.media-viewer video{max-width:90vw;max-height:85vh;border-radius:10px;object-fit:contain;width:90vw;height:auto}
-.media-viewer-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none}
+.media-viewer img,.media-viewer video{max-width:90vw;max-height:82vh;border-radius:10px;object-fit:contain;width:90vw;height:auto}
+.media-viewer-close{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none}
 /* preload iframe container */
 #preload-container{position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;overflow:hidden;z-index:-1}
 .modal-title{font-size:16px;font-weight:600;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #ebebeb;display:flex;justify-content:space-between;align-items:center}
@@ -925,7 +925,8 @@ function translateGeminiError(msg){
   return '解析に失敗しました（'+msg+'）';
 }
 
-function runAnalysis(rawUrl, resultEl, onSuccess, videoFileId){
+function runAnalysis(rawUrl, resultEl, onSuccess, videoFileId, contextPrompt){
+  var promptToUse = contextPrompt || SWING_PROMPT;
   var key = localStorage.getItem('golflog_gemini_key');
   if(!key){ alert('データタブでGemini APIキーを設定してください'); return; }
 
@@ -941,7 +942,7 @@ function runAnalysis(rawUrl, resultEl, onSuccess, videoFileId){
   fetch('https://golf-analyzer.monsen675.workers.dev/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fileId: fileId, apiKey: key, prompt: SWING_PROMPT })
+    body: JSON.stringify({ fileId: fileId, apiKey: key, prompt: promptToUse })
   })
   .then(function(r){ return r.json(); })
   .then(function(data){
@@ -954,28 +955,48 @@ function runAnalysis(rawUrl, resultEl, onSuccess, videoFileId){
   });
 }
 
+function buildHoleContext(h, n){
+  var ctx = n+'ホール目 (Par'+(h.par||4)+')';
+  if(h.score !== null){ var d=h.score-(h.par||4); ctx += ' / '+h.score+'打 ('+badgeLabel(d)+')'; }
+  if(h.putts !== null) ctx += ' / '+h.putts+'パット';
+  if(h.ob) ctx += ' / OB '+h.ob;
+  if(h.comment) ctx += '\nメモ: '+h.comment;
+  return ctx;
+}
+
 function analyzeSwing(n, idx){
   var urls = currentHoleData[n-1].videoUrls;
   if(!urls||!urls[idx]) return;
   var wrap = document.getElementById('analysis-wrap-'+n+'-'+idx);
   if(!wrap){ wrap = document.createElement('div'); wrap.id='analysis-wrap-'+n+'-'+idx; }
-  // 一時的な進捗表示用div
   var tempId = 'analysis-'+n+'-'+idx;
   wrap.innerHTML = '<div id="'+tempId+'" style="display:block;font-size:12px;color:#1a1a1a;line-height:1.7;background:#fff;border-radius:6px;padding:8px;border:1px solid #e0e0d8"></div>';
   var resultEl = document.getElementById(tempId);
+  var contextPrompt = SWING_PROMPT + '\n\n【このホールの記録】\n' + buildHoleContext(currentHoleData[n-1], n);
   runAnalysis(urls[idx].raw, resultEl, function(text){
     currentHoleData[n-1].videoUrls[idx].analysis = text;
     wrap.innerHTML = makeAnalysisBlock(formatAnalysisHtml(text), 'analysis-'+n+'-'+idx);
-  }, urls[idx].videoFileId||null);
+  }, urls[idx].videoFileId||null, contextPrompt);
 }
 
 function analyzeSwingEm(n, idx){
   var urls = window.emVideoUrls && window.emVideoUrls[n];
   if(!urls||!urls[idx]) return;
   var resultEl = document.getElementById('em-analysis-'+n+'-'+idx);
+  // 編集モーダルではholesデータから取得
+  var rec = records.find(function(x){return x.id===editingId;});
+  var holeData = rec && rec.holes && rec.holes[n-1] ? rec.holes[n-1] : {};
+  var ctx = buildHoleContext({
+    par: holeData.par||4,
+    score: holeData.score||null,
+    putts: holeData.putts||null,
+    ob: holeData.ob||0,
+    comment: document.getElementById('em-cmt-'+n) ? document.getElementById('em-cmt-'+n).value : (holeData.comment||'')
+  }, n);
+  var contextPrompt = SWING_PROMPT + '\n\n【このホールの記録】\n' + ctx;
   runAnalysis(urls[idx].raw, resultEl, function(text){
     window.emVideoUrls[n][idx].analysis = text;
-  }, urls[idx].videoFileId||null);
+  }, urls[idx].videoFileId||null, contextPrompt);
 }
 var urlModalHole = null;
 var urlModalFile = null;
@@ -1086,16 +1107,17 @@ function preloadVideoUrl(embedUrl){
 function openVideoUrl(embedUrl){
   var content = document.getElementById('media-viewer-content');
   content.innerHTML = '';
-  // プリロード済みiframeがあればそれを使う
-  var existing = preloadedIframes[embedUrl];
-  if(existing){
-    var iframe = existing.cloneNode(false);
-    iframe.style.cssText = 'width:90vw;max-width:400px;height:160vw;max-height:85vh;border:none;border-radius:10px';
-    iframe.allowFullscreen = true;
-    content.appendChild(iframe);
-  } else {
-    content.innerHTML = '<iframe src="'+embedUrl+'" style="width:90vw;max-width:400px;height:160vw;max-height:85vh;border:none;border-radius:10px" allowfullscreen></iframe>';
-  }
+  // GoogleドライブのURLをダウンロードURLに変換してvideoタグで表示
+  var videoSrc = embedUrl;
+  var m = embedUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if(m) videoSrc = 'https://drive.google.com/uc?export=download&id='+m[1];
+  var video = document.createElement('video');
+  video.src = videoSrc;
+  video.controls = true;
+  video.playsInline = true;
+  video.autoplay = true;
+  video.style.cssText = 'width:90vw;max-height:82vh;border-radius:10px;object-fit:contain;display:block;background:#000';
+  content.appendChild(video);
   document.getElementById('media-viewer').classList.add('on');
 }
 function triggerMediaPicker(n){
