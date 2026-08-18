@@ -1107,17 +1107,15 @@ function preloadVideoUrl(embedUrl){
 function openVideoUrl(embedUrl){
   var content = document.getElementById('media-viewer-content');
   content.innerHTML = '';
-  // GoogleドライブのURLをダウンロードURLに変換してvideoタグで表示
-  var videoSrc = embedUrl;
   var m = embedUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if(m) videoSrc = 'https://drive.google.com/uc?export=download&id='+m[1];
-  var video = document.createElement('video');
-  video.src = videoSrc;
-  video.controls = true;
-  video.playsInline = true;
-  video.autoplay = true;
-  video.style.cssText = 'width:90vw;max-height:82vh;border-radius:10px;object-fit:contain;display:block;background:#000';
-  content.appendChild(video);
+  var previewUrl = m ? 'https://drive.google.com/file/d/'+m[1]+'/preview' : embedUrl;
+  var iframe = document.createElement('iframe');
+  iframe.src = previewUrl;
+  iframe.setAttribute('allowfullscreen','');
+  iframe.setAttribute('allow','autoplay');
+  // 縦向き動画想定・コントロールバー込みで画面内に収まるサイズ
+  iframe.style.cssText = 'width:90vw;height:75vw;max-width:380px;max-height:82vh;border:none;border-radius:10px;display:block';
+  content.appendChild(iframe);
   document.getElementById('media-viewer').classList.add('on');
 }
 function triggerMediaPicker(n){
