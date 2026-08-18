@@ -211,7 +211,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-data:active{background:#e8e8e0}
 .btn-data-import{border-color:#B5D4F4;background:#f0f8ff;color:#0C447C}
 /* onboarding banner */
-/* goal line */
+/* collapsible analysis */
+.analysis-collapsed{max-height:3.4em;overflow:hidden;position:relative}
+.analysis-collapsed::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1.5em;background:linear-gradient(transparent,#fff)}
+.analysis-toggle{display:flex;align-items:center;gap:4px;font-size:11px;color:#378ADD;cursor:pointer;background:none;border:none;padding:4px 0;font-weight:500;-webkit-tap-highlight-color:transparent}
+.analysis-toggle svg{transition:transform 0.2s;flex-shrink:0}
 .goal-tag{font-size:9px;font-weight:600;fill:#E87C2B}
 /* URL動画入力モーダル */
 .url-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;align-items:center;justify-content:center}
@@ -423,7 +427,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <button class="btn-save-all" id="dm-ai-btn" onclick="analyzeRound()" style="width:100%;margin-top:14px;margin-bottom:12px;background:#378ADD;display:flex;align-items:center;justify-content:center;gap:6px">
       🤖 AIでラウンド全体を総評する
     </button>
-    <div id="dm-ai-result" style="display:none;background:#f0f8ff;border:1px solid #B5D4F4;border-radius:12px;padding:14px;margin-bottom:14px;font-size:13px;color:#1a1a1a;line-height:1.8"></div>
+    <div id="dm-ai-result-wrap" style="display:none;margin-bottom:14px">
+      <div id="dm-ai-result" style="font-size:13px;color:#1a1a1a;line-height:1.8;background:#f0f8ff;border:1px solid #B5D4F4;border-radius:12px;padding:14px" class="analysis-collapsed"></div>
+      <button class="analysis-toggle" data-target="dm-ai-result" onclick="toggleAnalysis(this)" style="margin-top:4px">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <span>すべて表示</span>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -883,47 +893,19 @@ function initApiKey(){
 }
 
 // ---- Swing Analysis (共通コア) ----
-var SWING_PROMPT = 'あなたは日本トッププロのゴルフコーチです。この動画を最初から最後まで、コマ単位で細かく分析してください。\n\n' +
-  '以下の各フェーズを順番に詳しく評価してください：\n\n' +
-  '【アドレス】\n' +
-  '・スタンス幅、足の向き、体重配分\n' +
-  '・グリップの握り方、ハンドポジション\n' +
-  '・姿勢（前傾角度、背中の状態）\n' +
-  '・ボールとの距離感\n\n' +
-  '【テイクバック】\n' +
-  '・クラブの軌道（インサイド/アウトサイド）\n' +
-  '・左腕の伸び、肘の状態\n' +
-  '・肩の回転量、腰の回転\n' +
-  '・体重移動のタイミング\n\n' +
-  '【トップ】\n' +
-  '・クラブフェースの向き（スクエア/オープン/クローズ）\n' +
-  '・左腕の角度、コックの深さ\n' +
-  '・肩の回転角度（理想は90度以上）\n' +
-  '・頭の位置、軸のブレ\n\n' +
-  '【ダウンスイング】\n' +
-  '・切り返しのタイミング\n' +
-  '・下半身リード（腰→肩→腕の順）の有無\n' +
-  '・クラブの軌道（ループの有無）\n' +
-  '・右肘の使い方、タメの維持\n\n' +
-  '【インパクト】\n' +
-  '・フェースの向き、スクエアかどうか\n' +
-  '・手元の位置（ハンドファーストかどうか）\n' +
-  '・体重移動（左足への乗り方）\n' +
-  '・頭の位置、目線\n\n' +
-  '【フォロースルー〜フィニッシュ】\n' +
-  '・クラブの抜け方、方向性\n' +
-  '・左肘の状態\n' +
-  '・体の回転、フィニッシュの形\n' +
-  '・バランスと軸の安定性\n\n' +
-  '---\n\n' +
-  '上記の分析を踏まえて、以下をまとめてください：\n\n' +
-  '1. 【飛距離の推定】スイングスピードや体の使い方から推定\n' +
-  '2. 【ボールの軌道予測】フェード・ドロー・スライス・フックなど\n' +
-  '3. 【このスイングの強み】具体的に2〜3点\n' +
-  '4. 【最優先の改善ポイント】最も重要な課題を2〜3点、具体的に\n' +
-  '5. 【今日から実践できる練習法】課題に対する具体的な練習方法\n' +
-  '6. 【総合評価】100点満点でのスコアと一言コメント\n\n' +
-  '動画全体をしっかり確認した上で、具体的かつ詳細に答えてください。';
+var SWING_PROMPT = '以下のゴルフスイング動画を分析してください。挨拶・前置き・締めの言葉は不要です。結論から簡潔に記載してください。\n\n' +
+  '1. 【アドレス〜トップ】姿勢・グリップ・テイクバックの評価（2〜3行）\n' +
+  '2. 【ダウンスイング〜インパクト】体重移動・フェースの向き・クラブ軌道の評価（2〜3行）\n' +
+  '3. 【フォロー〜フィニッシュ】振り抜き・バランス・軸の安定性の評価（2〜3行）\n' +
+  '4. 【良い点】具体的に2点\n' +
+  '5. 【改善点】具体的に2点\n' +
+  '6. 【推定飛距離】以下のルールで厳密に判断してください：\n' +
+  '   - ダフリ・トップ・シャンク・空振りなど明らかなミスショットの場合は「ミスショット（ダフリ）」「トップ（数ヤード）」など正直に記載する\n' +
+  '   - ボールの行方が動画から確認できない場合は「動画からボールの確認不可」と記載する\n' +
+  '   - スイングが綺麗に見えても、実際に見えたボールの動きと矛盾する飛距離は書かない\n' +
+  '   - 推定する場合は「約〇〇ヤード程度」と記載し、過大評価しない\n' +
+  '7. 【総合評価】100点満点でのスコアと最重要アドバイス1点\n\n' +
+  '各項目は簡潔にまとめてください。余計な言葉は不要です。';
 
 function formatAnalysisHtml(text){
   return text
@@ -981,9 +963,15 @@ function runAnalysis(rawUrl, resultEl, onSuccess, videoFileId){
 function analyzeSwing(n, idx){
   var urls = currentHoleData[n-1].videoUrls;
   if(!urls||!urls[idx]) return;
-  var resultEl = document.getElementById('analysis-'+n+'-'+idx);
+  var wrap = document.getElementById('analysis-wrap-'+n+'-'+idx);
+  if(!wrap){ wrap = document.createElement('div'); wrap.id='analysis-wrap-'+n+'-'+idx; }
+  // 一時的な進捗表示用div
+  var tempId = 'analysis-'+n+'-'+idx;
+  wrap.innerHTML = '<div id="'+tempId+'" style="display:block;font-size:12px;color:#1a1a1a;line-height:1.7;background:#fff;border-radius:6px;padding:8px;border:1px solid #e0e0d8"></div>';
+  var resultEl = document.getElementById(tempId);
   runAnalysis(urls[idx].raw, resultEl, function(text){
     currentHoleData[n-1].videoUrls[idx].analysis = text;
+    wrap.innerHTML = makeAnalysisBlock(formatAnalysisHtml(text), 'analysis-'+n+'-'+idx);
   }, urls[idx].videoFileId||null);
 }
 
@@ -1073,7 +1061,7 @@ function renderUrlList(n){
         '<button class="media-btn" style="flex:none;padding:4px 8px;font-size:11px;background:#EAF3DE;border-color:#C0DD97;color:#27500A" onclick="analyzeSwing('+n+','+idx+')">🏌️ 解析</button>'+
         '<button class="video-link-del" onclick="deleteVideoUrl(event,'+n+','+idx+')">✕</button>'+
       '</div>'+
-      '<div id="analysis-'+n+'-'+idx+'" style="display:none;font-size:12px;color:#1a1a1a;line-height:1.7;background:#fff;border-radius:6px;padding:8px;border:1px solid #e0e0d8"></div>'+
+      '<div id="analysis-wrap-'+n+'-'+idx+'"></div>'+
     '</div>';
   }).join('');
 }
@@ -1660,12 +1648,16 @@ function openDetail(id){
   btn.innerHTML = '🤖 AIでラウンド全体を総評する';
   // 過去の総評があれば表示
   var resultEl = document.getElementById('dm-ai-result');
+  var resultWrap = document.getElementById('dm-ai-result-wrap');
   if(r.aiReview){
-    resultEl.style.display = 'block';
+    resultWrap.style.display = 'block';
+    resultEl.classList.add('analysis-collapsed');
     resultEl.innerHTML = formatAnalysisHtml(r.aiReview);
+    var toggleBtn = resultWrap.querySelector('.analysis-toggle span');
+    if(toggleBtn) toggleBtn.textContent = 'すべて表示';
     btn.innerHTML = '🔄 AIで再総評する';
   } else {
-    resultEl.style.display = 'none';
+    resultWrap.style.display = 'none';
     resultEl.innerHTML = '';
   }
   var di=diffInfo(r.total-r.par);
@@ -1707,9 +1699,7 @@ function openDetail(id){
       h.videoUrls.forEach(function(u){ preloadVideoUrl(u.embed); });
       videoUrlHtml='<div style="margin-top:6px">'+h.videoUrls.map(function(u,vi){
         var analysisHtml = u.analysis ?
-          '<div style="font-size:11px;color:#555;line-height:1.6;background:#fff;border-radius:6px;padding:6px 8px;border:1px solid #e0e0d8;margin-top:4px">'+
-            u.analysis.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/【(.*?)】/g,'<span style="font-weight:600;color:#0C447C">【$1】</span>').replace(/\n/g,'<br>')+
-          '</div>' : '';
+          makeAnalysisBlock(formatAnalysisHtml(u.analysis), 'dm-analysis-'+i+'-'+vi) : '';
         return '<div class="video-link-thumb" style="flex-direction:column;align-items:stretch;gap:4px">'+
           '<div style="display:flex;align-items:center;gap:8px">'+
             '<span class="video-link-icon" onclick="openVideoUrl(\''+u.embed+'\')" style="cursor:pointer">▶️</span>'+
@@ -1746,6 +1736,28 @@ function openDetail(id){
       });
     });
   });
+}
+
+function toggleAnalysis(btn){
+  var target = document.getElementById(btn.getAttribute('data-target'));
+  var expanded = target.classList.contains('analysis-collapsed');
+  if(expanded){
+    target.classList.remove('analysis-collapsed');
+    btn.querySelector('span').textContent = '折りたたむ';
+    btn.querySelector('svg').style.transform = 'rotate(180deg)';
+  } else {
+    target.classList.add('analysis-collapsed');
+    btn.querySelector('span').textContent = 'すべて表示';
+    btn.querySelector('svg').style.transform = 'rotate(0deg)';
+  }
+}
+
+function makeAnalysisBlock(html, id){
+  return '<div id="'+id+'" class="analysis-collapsed" style="font-size:12px;color:#1a1a1a;line-height:1.7;background:#fff;border-radius:6px;padding:8px;border:1px solid #e0e0d8">'+html+'</div>'+
+    '<button class="analysis-toggle" data-target="'+id+'" onclick="toggleAnalysis(this)">'+
+      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>'+
+      '<span>すべて表示</span>'+
+    '</button>';
 }
 
 function closeDetailModal(){
@@ -1798,16 +1810,15 @@ function analyzeRound(){
     (r.totalPutts !== null ? '\n合計パット: '+r.totalPutts : '')+
     '\n\nホール別詳細:\n'+holeLines;
 
-  var prompt = 'あなたはプロのゴルフコーチです。以下のラウンド記録（スコア、パット数、各ホールのメモ、スイング動画の解析結果）を総合的に分析して、日本語で総評してください。\n\n'+
+  var prompt = '以下のゴルフラウンド記録を分析してください。挨拶・前置き・締めの言葉は不要です。結論から簡潔に記載してください。\n\n'+
     '=== ラウンドデータ ===\n'+summary+'\n\n'+
     '以下の項目で総評してください：\n'+
     '1. 【ラウンド総評】このラウンド全体の評価（2〜3文）\n'+
     '2. 【スコア分析】前半・後半の流れ、良かったホール・苦しんだホール\n'+
-    '3. 【パット分析】パット数から見えること（パット数データがある場合）\n'+
-    '4. 【スイング傾向】動画解析結果から見えるスイングの共通課題\n'+
-    '5. 【今後の課題】次のラウンドに向けて最優先で取り組むべき2〜3点\n'+
-    '6. 【一言メッセージ】励ましや前向きなアドバイスを一言\n\n'+
-    '各項目を簡潔にまとめてください。';
+    '3. 【パット分析】パット数から見えること（データがある場合のみ）\n'+
+    '4. 【スイング傾向】動画解析から見える共通課題（データがある場合のみ）\n'+
+    '5. 【今後の課題】次のラウンドへ最優先で取り組むべき2点\n\n'+
+    '各項目は簡潔に。余計な言葉は不要です。';
 
   fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+key, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1815,17 +1826,24 @@ function analyzeRound(){
   }).then(function(r){ return r.json(); }).then(function(data){
     btn.disabled = false;
     btn.innerHTML = '🔄 AIで再総評する';
-    if(data.error){ resultEl.innerHTML = '⚠️ '+translateGeminiError(data.error.message); return; }
+    var resultEl = document.getElementById('dm-ai-result');
+    var resultWrap = document.getElementById('dm-ai-result-wrap');
+    if(data.error){ resultEl.innerHTML = '⚠️ '+translateGeminiError(data.error.message); resultWrap.style.display='block'; return; }
     var text = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '総評を取得できませんでした';
+    resultEl.classList.add('analysis-collapsed');
     resultEl.innerHTML = formatAnalysisHtml(text);
-    // 総評を記録に保存
+    resultWrap.style.display = 'block';
+    var toggleBtn = resultWrap.querySelector('.analysis-toggle span');
+    if(toggleBtn) toggleBtn.textContent = 'すべて表示';
     var rec = records.find(function(x){ return x.id === detailRecordId; });
     if(rec){ rec.aiReview = text; persist(); }
   }).catch(function(err){
     btn.disabled = false;
     btn.innerHTML = '🤖 AIでラウンド全体を総評する';
+    var resultEl = document.getElementById('dm-ai-result');
+    var resultWrap = document.getElementById('dm-ai-result-wrap');
     resultEl.innerHTML = '⚠️ '+translateGeminiError(err.message);
-    resultEl.innerHTML = '⚠️ 通信エラー: '+err.message;
+    resultWrap.style.display = 'block';
   });
 }
 
@@ -2034,9 +2052,8 @@ function analyzeGrowth(){
     '2. 【改善されたこと】以前と比べて良くなってきた点\n'+
     '3. 【継続している課題】複数のラウンドで共通して見られる課題\n'+
     '4. 【現在の状態】今のゴルフの総合的な状態・レベル\n'+
-    '5. 【次のステップ】さらなる上達のために今最も取り組むべきこと\n'+
-    '6. 【コーチから一言】このゴルファーへの励ましとアドバイス\n\n'+
-    '全体を通じた客観的な視点で、具体的に分析してください。';
+    '5. 【次のステップ】今最も取り組むべきこと\n\n'+
+    '挨拶・前置き・締めの言葉は不要です。各項目を簡潔に記載してください。';
 
   fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+key, {
     method:'POST', headers:{'Content-Type':'application/json'},
