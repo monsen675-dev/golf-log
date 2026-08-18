@@ -1114,7 +1114,7 @@ function openVideoUrl(embedUrl){
   iframe.setAttribute('allowfullscreen','');
   iframe.setAttribute('allow','autoplay');
   // 縦向き動画想定・コントロールバー込みで画面内に収まるサイズ
-  iframe.style.cssText = 'width:90vw;height:75vw;max-width:380px;max-height:82vh;border:none;border-radius:10px;display:block';
+  iframe.style.cssText = 'width:90vw;height:160vw;max-height:80vh;max-width:380px;border:none;border-radius:10px;display:block';
   content.appendChild(iframe);
   document.getElementById('media-viewer').classList.add('on');
 }
