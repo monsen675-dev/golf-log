@@ -949,78 +949,33 @@ function translateGeminiError(msg){
   return '解析に失敗しました（'+msg+'）';
 }
 
-function runAnalysis(rawUrl, resultEl, onSuccess){
+function runAnalysis(rawUrl, resultEl, onSuccess, videoFileId){
   var key = localStorage.getItem('golflog_gemini_key');
   if(!key){ alert('データタブでGemini APIキーを設定してください'); return; }
 
-  // ファイル選択ダイアログを表示
-  var input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'video/*';
-  input.style.display = 'none';
-  document.body.appendChild(input);
+  var fileId = null;
+  var m = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if(m) fileId = m[1];
+  if(!fileId){ m = rawUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/); if(m) fileId = m[1]; }
+  if(!fileId){ resultEl.innerHTML = '⚠️ GoogleドライブのURLを正しく入力してください'; return; }
 
   resultEl.style.display = 'block';
-  resultEl.innerHTML = '📂 解析する動画ファイルを選択してください<br><small style="color:#555">（Googleドライブに保存した動画をスマホにダウンロードして選択）</small>';
+  resultEl.innerHTML = '<span class="spin">↻</span> ①動画を取得中...<br><small style="color:#555">（動画サイズによって1〜2分かかります）</small>';
 
-  input.onchange = function(){
-    var file = input.files[0];
-    if(!file){ resultEl.innerHTML = '⚠️ ファイルが選択されませんでした'; document.body.removeChild(input); return; }
-    if(file.size > 500 * 1024 * 1024){ resultEl.innerHTML = '⚠️ ファイルサイズが大きすぎます（500MB以下）'; document.body.removeChild(input); return; }
-    document.body.removeChild(input);
-
-    // Step1: Gemini File APIにアップロード
-    resultEl.innerHTML = '<span class="spin">↻</span> ①AIサーバーにアップロード中...（動画サイズによって1〜2分かかります）';
-    fetch('https://generativelanguage.googleapis.com/upload/v1beta/files?key='+key, {
-      method: 'POST',
-      headers: {
-        'X-Goog-Upload-Command': 'start, upload, finalize',
-        'X-Goog-Upload-Header-Content-Type': file.type,
-        'X-Goog-Upload-Header-Content-Length': file.size,
-        'Content-Type': file.type
-      },
-      body: file
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(uploadData){
-      if(!uploadData.file || !uploadData.file.uri){
-        throw new Error('アップロードに失敗しました: '+(uploadData.error&&uploadData.error.message||JSON.stringify(uploadData)));
-      }
-      var fileUri = uploadData.file.uri;
-      var mimeType = uploadData.file.mimeType || file.type || 'video/mp4';
-      resultEl.innerHTML = '<span class="spin">↻</span> ②Geminiが動画を解析中...（10〜30秒かかります）';
-
-      // Step2: Geminiで解析
-      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+key, {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          contents:[{parts:[
-            {text: SWING_PROMPT},
-            {file_data:{ mime_type: mimeType, file_uri: fileUri }}
-          ]}],
-          generationConfig:{ maxOutputTokens: 4096, temperature: 0.2 }
-        })
-      }).then(function(r){ return r.json(); }).then(function(data){
-        // Step3: 一時ファイルを削除
-        var fileName = fileUri.split('/').pop();
-        fetch('https://generativelanguage.googleapis.com/v1beta/files/'+fileName+'?key='+key, {method:'DELETE'}).catch(function(){});
-        return data;
-      });
-    })
-    .then(function(data){
-      if(data.error){ resultEl.innerHTML = '⚠️ ' + translateGeminiError(data.error.message); return; }
-      var text = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0]
-        ? data.candidates[0].content.parts[0].text : '解析結果を取得できませんでした';
-      resultEl.innerHTML = formatAnalysisHtml(text);
-      onSuccess(text);
-    })
-    .catch(function(err){
-      resultEl.innerHTML = '⚠️ ' + translateGeminiError(err.message);
-    });
-  };
-
-  input.click();
+  fetch('https://golf-analyzer.monsen675.workers.dev/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileId: fileId, apiKey: key, prompt: SWING_PROMPT })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.error){ resultEl.innerHTML = '⚠️ ' + translateGeminiError(data.error); return; }
+    resultEl.innerHTML = formatAnalysisHtml(data.result);
+    onSuccess(data.result);
+  })
+  .catch(function(err){
+    resultEl.innerHTML = '⚠️ ' + translateGeminiError(err.message);
+  });
 }
 
 function analyzeSwing(n, idx){
@@ -1029,7 +984,7 @@ function analyzeSwing(n, idx){
   var resultEl = document.getElementById('analysis-'+n+'-'+idx);
   runAnalysis(urls[idx].raw, resultEl, function(text){
     currentHoleData[n-1].videoUrls[idx].analysis = text;
-  });
+  }, urls[idx].videoFileId||null);
 }
 
 function analyzeSwingEm(n, idx){
@@ -1038,12 +993,14 @@ function analyzeSwingEm(n, idx){
   var resultEl = document.getElementById('em-analysis-'+n+'-'+idx);
   runAnalysis(urls[idx].raw, resultEl, function(text){
     window.emVideoUrls[n][idx].analysis = text;
-  });
+  }, urls[idx].videoFileId||null);
 }
 var urlModalHole = null;
+var urlModalFile = null;
 
 function openUrlModal(n){
   urlModalHole = n;
+  urlModalFile = null;
   document.getElementById('url-modal-input').value = '';
   document.getElementById('url-modal-hint').textContent = '';
   document.getElementById('url-modal').classList.add('on');
@@ -1054,6 +1011,30 @@ function closeUrlModal(){
   document.getElementById('url-modal').classList.remove('on');
   urlModalHole = null;
   emUrlModalHole = null;
+  urlModalFile = null;
+}
+
+function confirmUrlModal(){
+  var raw = document.getElementById('url-modal-input').value.trim();
+  var hint = document.getElementById('url-modal-hint');
+  if(!raw){ hint.textContent = '⚠️ URLを入力してください'; hint.style.color='#A32D2D'; return; }
+  var entry = {raw: raw, embed: gdriveDirect(raw)};
+  if(emUrlModalHole !== null){
+    var n = emUrlModalHole;
+    if(!window.emVideoUrls) window.emVideoUrls = {};
+    if(!window.emVideoUrls[n]) window.emVideoUrls[n] = [];
+    window.emVideoUrls[n].push(entry);
+    renderEmUrlList(n);
+    closeUrlModal();
+    emUrlModalHole = null;
+  } else if(urlModalHole !== null){
+    var n = urlModalHole;
+    if(!currentHoleData[n-1].videoUrls) currentHoleData[n-1].videoUrls = [];
+    currentHoleData[n-1].videoUrls.push(entry);
+    renderUrlList(n);
+    document.getElementById('hcmt-btn-'+n).classList.add('has-comment');
+    closeUrlModal();
+  }
 }
 
 function gdriveDirect(url){
@@ -1308,22 +1289,52 @@ function confirmUrlModal(){
   var raw = document.getElementById('url-modal-input').value.trim();
   var hint = document.getElementById('url-modal-hint');
   if(!raw){ hint.textContent = '⚠️ URLを入力してください'; hint.style.color='#A32D2D'; return; }
-  if(emUrlModalHole !== null){
-    // 編集モーダル用
-    var n = emUrlModalHole;
-    if(!window.emVideoUrls) window.emVideoUrls = {};
-    if(!window.emVideoUrls[n]) window.emVideoUrls[n] = [];
-    window.emVideoUrls[n].push({raw: raw, embed: gdriveDirect(raw)});
-    renderEmUrlList(n);
-    closeUrlModal();
-    emUrlModalHole = null;
-  } else if(urlModalHole !== null){
-    var n = urlModalHole;
+
+  var videoId = urlModalFile ? genMediaId() : null;
+  var entry = {raw: raw, embed: gdriveDirect(raw), videoFileId: videoId};
+
+  function finalize(n){
     if(!currentHoleData[n-1].videoUrls) currentHoleData[n-1].videoUrls = [];
-    currentHoleData[n-1].videoUrls.push({raw: raw, embed: gdriveDirect(raw)});
+    currentHoleData[n-1].videoUrls.push(entry);
     renderUrlList(n);
     document.getElementById('hcmt-btn-'+n).classList.add('has-comment');
     closeUrlModal();
+  }
+
+  if(emUrlModalHole !== null){
+    var n = emUrlModalHole;
+    if(!window.emVideoUrls) window.emVideoUrls = {};
+    if(!window.emVideoUrls[n]) window.emVideoUrls[n] = [];
+    if(urlModalFile && videoId){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        idbSave({id: videoId, type: 'video', data: e.target.result, name: urlModalFile.name}, function(){
+          window.emVideoUrls[n].push(entry);
+          renderEmUrlList(n);
+          closeUrlModal();
+          emUrlModalHole = null;
+        });
+      };
+      reader.readAsDataURL(urlModalFile);
+    } else {
+      window.emVideoUrls[n].push(entry);
+      renderEmUrlList(n);
+      closeUrlModal();
+      emUrlModalHole = null;
+    }
+  } else if(urlModalHole !== null){
+    var n = urlModalHole;
+    if(urlModalFile && videoId){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        idbSave({id: videoId, type: 'video', data: e.target.result, name: urlModalFile.name}, function(){
+          finalize(n);
+        });
+      };
+      reader.readAsDataURL(urlModalFile);
+    } else {
+      finalize(n);
+    }
   }
 }
 
