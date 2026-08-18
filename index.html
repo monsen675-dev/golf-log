@@ -952,84 +952,75 @@ function translateGeminiError(msg){
 function runAnalysis(rawUrl, resultEl, onSuccess){
   var key = localStorage.getItem('golflog_gemini_key');
   if(!key){ alert('データタブでGemini APIキーを設定してください'); return; }
+
+  // ファイル選択ダイアログを表示
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'video/*';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+
   resultEl.style.display = 'block';
+  resultEl.innerHTML = '📂 解析する動画ファイルを選択してください<br><small style="color:#555">（Googleドライブに保存した動画をスマホにダウンロードして選択）</small>';
 
-  // GoogleドライブのファイルIDを取得
-  var fileId = null;
-  var m = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if(m) fileId = m[1];
-  if(!fileId){ m = rawUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/); if(m) fileId = m[1]; }
-  if(!fileId){ resultEl.innerHTML = '⚠️ GoogleドライブのURLを正しく入力してください'; return; }
+  input.onchange = function(){
+    var file = input.files[0];
+    if(!file){ resultEl.innerHTML = '⚠️ ファイルが選択されませんでした'; document.body.removeChild(input); return; }
+    if(file.size > 500 * 1024 * 1024){ resultEl.innerHTML = '⚠️ ファイルサイズが大きすぎます（500MB以下）'; document.body.removeChild(input); return; }
+    document.body.removeChild(input);
 
-  var downloadUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
-
-  // Step1: GoogleDriveから動画をダウンロード
-  resultEl.innerHTML = '<span class="spin">↻</span> ①動画をダウンロード中...';
-  fetch(downloadUrl)
-  .then(function(r){
-    if(!r.ok) throw new Error('Googleドライブからダウンロードできませんでした。共有設定を「リンクを知っている全員が閲覧可」にしてください。');
-    return r.blob();
-  })
-  .then(function(blob){
-    // Step2: Gemini File APIにアップロード
-    resultEl.innerHTML = '<span class="spin">↻</span> ②AIサーバーにアップロード中...（動画サイズによって1〜2分かかります）';
-    var mimeType = blob.type || 'video/mp4';
-    return fetch('https://generativelanguage.googleapis.com/upload/v1beta/files?key='+key, {
+    // Step1: Gemini File APIにアップロード
+    resultEl.innerHTML = '<span class="spin">↻</span> ①AIサーバーにアップロード中...（動画サイズによって1〜2分かかります）';
+    fetch('https://generativelanguage.googleapis.com/upload/v1beta/files?key='+key, {
       method: 'POST',
       headers: {
         'X-Goog-Upload-Command': 'start, upload, finalize',
-        'X-Goog-Upload-Header-Content-Type': mimeType,
-        'X-Goog-Upload-Header-Content-Length': blob.size,
-        'Content-Type': mimeType
+        'X-Goog-Upload-Header-Content-Type': file.type,
+        'X-Goog-Upload-Header-Content-Length': file.size,
+        'Content-Type': file.type
       },
-      body: blob
-    }).then(function(r){ return r.json(); });
-  })
-  .then(function(uploadData){
-    if(!uploadData.file || !uploadData.file.uri){
-      throw new Error('アップロードに失敗しました: '+(uploadData.error&&uploadData.error.message||JSON.stringify(uploadData)));
-    }
-    var fileUri = uploadData.file.uri;
-    var mimeType = uploadData.file.mimeType || 'video/mp4';
-    resultEl.innerHTML = '<span class="spin">↻</span> ③Geminiが動画を解析中...（10〜30秒かかります）';
+      body: file
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(uploadData){
+      if(!uploadData.file || !uploadData.file.uri){
+        throw new Error('アップロードに失敗しました: '+(uploadData.error&&uploadData.error.message||JSON.stringify(uploadData)));
+      }
+      var fileUri = uploadData.file.uri;
+      var mimeType = uploadData.file.mimeType || file.type || 'video/mp4';
+      resultEl.innerHTML = '<span class="spin">↻</span> ②Geminiが動画を解析中...（10〜30秒かかります）';
 
-    // Step3: Geminiで解析
-    return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+key, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        contents:[{parts:[
-          {text: SWING_PROMPT},
-          {file_data:{
-            mime_type: mimeType,
-            file_uri: fileUri
-          }}
-        ]}],
-        generationConfig:{
-          maxOutputTokens: 4096,
-          temperature: 0.2
-        },
-        videoMetadata:{
-          fps: 10
-        }
-      })
-    }).then(function(r){ return r.json(); }).then(function(data){
-      // Step4: アップロードしたファイルを削除（48時間以内に自動削除されるが念のため）
-      var fileName = fileUri.split('/').pop();
-      fetch('https://generativelanguage.googleapis.com/v1beta/files/'+fileName+'?key='+key, {method:'DELETE'}).catch(function(){});
-      return data;
+      // Step2: Geminiで解析
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+key, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          contents:[{parts:[
+            {text: SWING_PROMPT},
+            {file_data:{ mime_type: mimeType, file_uri: fileUri }}
+          ]}],
+          generationConfig:{ maxOutputTokens: 4096, temperature: 0.2 }
+        })
+      }).then(function(r){ return r.json(); }).then(function(data){
+        // Step3: 一時ファイルを削除
+        var fileName = fileUri.split('/').pop();
+        fetch('https://generativelanguage.googleapis.com/v1beta/files/'+fileName+'?key='+key, {method:'DELETE'}).catch(function(){});
+        return data;
+      });
+    })
+    .then(function(data){
+      if(data.error){ resultEl.innerHTML = '⚠️ ' + translateGeminiError(data.error.message); return; }
+      var text = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0]
+        ? data.candidates[0].content.parts[0].text : '解析結果を取得できませんでした';
+      resultEl.innerHTML = formatAnalysisHtml(text);
+      onSuccess(text);
+    })
+    .catch(function(err){
+      resultEl.innerHTML = '⚠️ ' + translateGeminiError(err.message);
     });
-  })
-  .then(function(data){
-    if(data.error){ resultEl.innerHTML = '⚠️ ' + translateGeminiError(data.error.message); return; }
-    var text = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0]
-      ? data.candidates[0].content.parts[0].text : '解析結果を取得できませんでした';
-    resultEl.innerHTML = formatAnalysisHtml(text);
-    onSuccess(text);
-  })
-  .catch(function(err){
-    resultEl.innerHTML = '⚠️ ' + (err.message.indexOf('ダウンロード') > -1 ? err.message : translateGeminiError(err.message));
-  });
+  };
+
+  input.click();
 }
 
 function analyzeSwing(n, idx){
