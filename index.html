@@ -212,8 +212,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-data-import{border-color:#B5D4F4;background:#f0f8ff;color:#0C447C}
 /* onboarding banner */
 /* collapsible analysis */
-.analysis-collapsed{max-height:3.4em;overflow:hidden;position:relative}
-.analysis-collapsed::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1.5em;background:linear-gradient(transparent,#fff)}
+.analysis-collapsed{max-height:4em;overflow:hidden;position:relative}
+.analysis-collapsed::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1.5em;background:linear-gradient(transparent,#fff);pointer-events:none}
+.analysis-expanded{max-height:none;overflow:visible}
 .analysis-toggle{display:flex;align-items:center;gap:4px;font-size:11px;color:#378ADD;cursor:pointer;background:none;border:none;padding:4px 0;font-weight:500;-webkit-tap-highlight-color:transparent}
 .analysis-toggle svg{transition:transform 0.2s;flex-shrink:0}
 .goal-tag{font-size:9px;font-weight:600;fill:#E87C2B}
@@ -311,6 +312,38 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <input type="number" inputmode="numeric" id="f-par" value="72" min="60" max="80" placeholder="72">
       </div>
     </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;justify-content:space-between">
+        クラブセッティング
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="f-clubs-count" style="font-size:11px;font-weight:600;color:#555"></span>
+          <button onclick="loadDefaultClubs()" style="font-size:11px;color:#378ADD;background:none;border:none;cursor:pointer;font-weight:500;padding:0">↩ デフォルト</button>
+        </div>
+      </label>
+      <div style="display:grid;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:#888;font-weight:500;min-width:110px">🪵 ドライバー</span>
+          <input type="text" id="f-club-driver" placeholder="例：1W" oninput="syncClubFields()" style="flex:1;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:#888;font-weight:500;min-width:110px">🌲 FW</span>
+          <input type="text" id="f-club-wood" placeholder="例：3W,5W" oninput="syncClubFields()" style="flex:1;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:#888;font-weight:500;min-width:110px">⛳ UT</span>
+          <input type="text" id="f-club-ut" placeholder="例：4U,5U" oninput="syncClubFields()" style="flex:1;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:#888;font-weight:500;min-width:110px">🔧 アイアン/W</span>
+          <input type="text" id="f-club-iron" placeholder="例：6I〜PW,SW" oninput="syncClubFields()" style="flex:1;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:#888;font-weight:500;min-width:110px">🎯 パター</span>
+          <input type="text" id="f-club-putter" placeholder="例：PT" oninput="syncClubFields()" style="flex:1;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a">
+        </div>
+      </div>
+      <input type="hidden" id="f-clubs">
+    </div>
   </div>
 
   <!-- 合計バー -->
@@ -336,6 +369,37 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div id="s-stats" class="sec">
   <div class="stats-grid" id="sg"></div>
   <div id="ca"></div>
+  <!-- クラブセッティング -->
+  <div class="chart-wrap" style="margin-top:10px" id="club-setting-card">
+    <div class="chart-lbl">🏌️ 基本クラブセッティング</div>
+    <div id="club-display" style="margin-bottom:10px"></div>
+    <button class="btn-ghost" id="club-edit-btn" onclick="toggleClubEdit()" style="width:100%;font-size:12px;padding:8px">✏️ 編集する</button>
+    <div id="club-edit-area" style="display:none;margin-top:10px">
+      <div style="display:grid;gap:8px">
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:11px;color:#555;font-weight:600">🪵 ドライバー</label>
+          <input type="text" id="dc-driver" placeholder="例：1W" style="font-size:14px;padding:8px 10px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;width:100%">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:11px;color:#555;font-weight:600">🌲 フェアウェイウッド</label>
+          <input type="text" id="dc-wood" placeholder="例：3W,5W" style="font-size:14px;padding:8px 10px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;width:100%">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:11px;color:#555;font-weight:600">⛳ ユーティリティ</label>
+          <input type="text" id="dc-ut" placeholder="例：4U,5U" style="font-size:14px;padding:8px 10px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;width:100%">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:11px;color:#555;font-weight:600">🔧 アイアン・ウェッジ</label>
+          <input type="text" id="dc-iron" placeholder="例：6I,7I,8I,9I,PW,SW,AW" style="font-size:14px;padding:8px 10px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;width:100%">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:11px;color:#555;font-weight:600">🎯 パター</label>
+          <input type="text" id="dc-putter" placeholder="例：PT" style="font-size:14px;padding:8px 10px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;width:100%">
+        </div>
+      </div>
+      <button class="btn-save-all" onclick="saveDefaultClubsNew()" style="width:100%;margin-top:10px">保存する</button>
+    </div>
+  </div>
 </div>
 
 <!-- データ管理 -->
@@ -407,6 +471,35 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="row2">
         <div class="field"><label>プレー日</label><input type="date" id="em-date"></div>
         <div class="field"><label>コースパー</label><input type="number" inputmode="numeric" id="em-par" min="60" max="80" placeholder="72"></div>
+      </div>
+      <div class="field">
+        <label style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          クラブセッティング
+          <span id="em-clubs-count" style="font-size:11px;font-weight:600;color:#555"></span>
+        </label>
+        <div style="display:grid;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:#888;font-weight:500;min-width:110px">🪵 ドライバー</span>
+            <input type="text" id="em-club-driver" oninput="syncEmClubFields()" style="flex:1;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a" placeholder="例：1W">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:#888;font-weight:500;min-width:110px">🌲 FW</span>
+            <input type="text" id="em-club-wood" oninput="syncEmClubFields()" style="flex:1;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a" placeholder="例：3W,5W">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:#888;font-weight:500;min-width:110px">⛳ UT</span>
+            <input type="text" id="em-club-ut" oninput="syncEmClubFields()" style="flex:1;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a" placeholder="例：4U,5U">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:#888;font-weight:500;min-width:110px">🔧 アイアン/W</span>
+            <input type="text" id="em-club-iron" oninput="syncEmClubFields()" style="flex:1;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a" placeholder="例：6I〜PW,SW">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:#888;font-weight:500;min-width:110px">🎯 パター</span>
+            <input type="text" id="em-club-putter" oninput="syncEmClubFields()" style="flex:1;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #d8d8d0;background:#f9f9f6;color:#1a1a1a" placeholder="例：PT">
+          </div>
+        </div>
+        <input type="hidden" id="em-clubs">
       </div>
       <div id="em-holes"></div>
     </div>
@@ -955,6 +1048,16 @@ function runAnalysis(rawUrl, resultEl, onSuccess, videoFileId, contextPrompt){
   });
 }
 
+function updateClubCount(){
+  var val = document.getElementById('f-clubs').value;
+  var count = val.split(',').map(function(s){return s.trim();}).filter(Boolean).length;
+  var el = document.getElementById('f-clubs-count');
+  if(!el) return;
+  if(count === 0){ el.textContent=''; return; }
+  el.textContent = count+'/14本';
+  el.style.color = count > 14 ? '#A32D2D' : count === 14 ? '#0F6E56' : '#555';
+}
+
 function buildHoleContext(h, n){
   var ctx = n+'ホール目 (Par'+(h.par||4)+')';
   if(h.score !== null){ var d=h.score-(h.par||4); ctx += ' / '+h.score+'打 ('+badgeLabel(d)+')'; }
@@ -1475,6 +1578,8 @@ function clearForm(){
   document.getElementById('f-course').value='';
   document.getElementById('f-date').value=fmtDate();
   document.getElementById('f-par').value='72';
+  document.getElementById('f-clubs').value=localStorage.getItem('golflog_default_clubs')||'';
+  loadDefaultClubs();
   initHoleData();
   buildHoles();
   updateTotals();
@@ -1507,6 +1612,16 @@ function saveAll(){
   var course=document.getElementById('f-course').value.trim()||'名称未設定';
   var date=document.getElementById('f-date').value;
   var par=parseInt(document.getElementById('f-par').value);
+  var clubs=document.getElementById('f-clubs').value.trim()||'';
+  var clubData={
+    driver: document.getElementById('f-club-driver').value.trim(),
+    wood: document.getElementById('f-club-wood').value.trim(),
+    ut: document.getElementById('f-club-ut').value.trim(),
+    iron: document.getElementById('f-club-iron').value.trim(),
+    putter: document.getElementById('f-club-putter').value.trim()
+  };
+  var clubCount = clubs.split(',').map(function(s){return s.trim();}).filter(Boolean).length;
+  if(clubCount > 14){ alert('クラブは14本以内にしてください（現在'+clubCount+'本）'); return; }
   if(isNaN(par)||par<60||par>80){ alert('コースパーを正しく入力してください（60〜80）'); return; }
   var totalScore=0, totalPutts=0, hasPutts=false;
   var holes=currentHoleData.map(function(h){
@@ -1517,7 +1632,7 @@ function saveAll(){
   var weatherSnap=null;
   if(lastWeather){var c=lastWeather.current,wi=wmoInfo(c.weather_code);weatherSnap={icon:wi.icon,label:wi.label,temp:Math.round(c.temperature_2m),wind:Math.round(c.wind_speed_10m),humid:Math.round(c.relative_humidity_2m)};}
   var gpsSnap=lastGps?{lat:lastGps.lat,lon:lastGps.lon}:null;
-  records.unshift({id:Date.now(),roundName:roundName,course:course,date:date,par:par,holes:holes,total:totalScore,filled:filled,totalPutts:hasPutts?totalPutts:null,weather:weatherSnap,gps:gpsSnap});
+  records.unshift({id:Date.now(),roundName:roundName,course:course,date:date,par:par,clubs:clubs,clubData:clubData,holes:holes,total:totalScore,filled:filled,totalPutts:hasPutts?totalPutts:null,weather:weatherSnap,gps:gpsSnap});
   persist(); clearForm(); go('list');
 }
 
@@ -1590,6 +1705,24 @@ function openEdit(id){
   document.getElementById('em-course').value=r.course;
   document.getElementById('em-date').value=r.date.replace(/\//g,'-');
   document.getElementById('em-par').value=r.par;
+  document.getElementById('em-clubs').value=r.clubs||'';
+  // カテゴリ別フィールドに展開（デフォルトデータを参考に）
+  var defData = getDefaultClubData();
+  // r.clubsがある場合はデフォルトを使い、なければ空
+  document.getElementById('em-club-driver').value = defData.driver||'';
+  document.getElementById('em-club-wood').value = defData.wood||'';
+  document.getElementById('em-club-ut').value = defData.ut||'';
+  document.getElementById('em-club-iron').value = defData.iron||'';
+  document.getElementById('em-club-putter').value = defData.putter||'';
+  // r.clubsがあれば上書き（カテゴリデータが保存されていれば）
+  if(r.clubData){
+    document.getElementById('em-club-driver').value = r.clubData.driver||'';
+    document.getElementById('em-club-wood').value = r.clubData.wood||'';
+    document.getElementById('em-club-ut').value = r.clubData.ut||'';
+    document.getElementById('em-club-iron').value = r.clubData.iron||'';
+    document.getElementById('em-club-putter').value = r.clubData.putter||'';
+  }
+  syncEmClubFields();
   var html='';
   for(var i=0;i<18;i++){
     var n=i+1;
@@ -1678,6 +1811,18 @@ function openDetail(id){
   document.getElementById('dm-title').textContent=(r.roundName||r.course||'ラウンド詳細');
   var metaParts=['📅 '+dispDate(r.date), r.course];
   if(r.roundName) metaParts.unshift('🏷 '+r.roundName);
+  if(r.clubData && Object.values(r.clubData).some(Boolean)){
+    var clubLines = [
+      r.clubData.driver ? '🪵 '+r.clubData.driver : '',
+      r.clubData.wood ? '🌲 '+r.clubData.wood : '',
+      r.clubData.ut ? '⛳ '+r.clubData.ut : '',
+      r.clubData.iron ? '🔧 '+r.clubData.iron : '',
+      r.clubData.putter ? '🎯 '+r.clubData.putter : ''
+    ].filter(Boolean).join(' / ');
+    metaParts.push(clubLines);
+  } else if(r.clubs){
+    metaParts.push('🏌️ '+r.clubs);
+  }
   if(r.weather) metaParts.push(r.weather.icon+' '+r.weather.temp+'°C · '+r.weather.label);
   if(r.gps) metaParts.push('📍'+r.gps.lat+', '+r.gps.lon);
   document.getElementById('dm-meta').innerHTML=metaParts.join(' &nbsp;·&nbsp; ');
@@ -1754,12 +1899,14 @@ function openDetail(id){
 
 function toggleAnalysis(btn){
   var target = document.getElementById(btn.getAttribute('data-target'));
-  var expanded = target.classList.contains('analysis-collapsed');
-  if(expanded){
+  var isCollapsed = target.classList.contains('analysis-collapsed');
+  if(isCollapsed){
     target.classList.remove('analysis-collapsed');
+    target.classList.add('analysis-expanded');
     btn.querySelector('span').textContent = '折りたたむ';
     btn.querySelector('svg').style.transform = 'rotate(180deg)';
   } else {
+    target.classList.remove('analysis-expanded');
     target.classList.add('analysis-collapsed');
     btn.querySelector('span').textContent = 'すべて表示';
     btn.querySelector('svg').style.transform = 'rotate(0deg)';
@@ -1818,10 +1965,25 @@ function analyzeRound(){
   var totalPar = r.par || 72;
   var diff = r.total - totalPar;
   var diffStr = diff === 0 ? 'イーブン' : (diff > 0 ? '+'+diff : ''+diff);
+
+  // クラブセッティング情報
+  var clubInfo = '';
+  if(r.clubData && Object.values(r.clubData).some(Boolean)){
+    clubInfo = '\n\nクラブセッティング:' +
+      (r.clubData.driver ? '\n　ドライバー: '+r.clubData.driver : '') +
+      (r.clubData.wood ? '\n　FW: '+r.clubData.wood : '') +
+      (r.clubData.ut ? '\n　UT: '+r.clubData.ut : '') +
+      (r.clubData.iron ? '\n　アイアン/W: '+r.clubData.iron : '') +
+      (r.clubData.putter ? '\n　パター: '+r.clubData.putter : '');
+  } else if(r.clubs){
+    clubInfo = '\nクラブセッティング: '+r.clubs;
+  }
+
   var summary = 'コース: '+r.course+(r.roundName?' ('+r.roundName+')':'')+
     '\n日付: '+dispDate(r.date)+
     '\n合計スコア: '+r.total+' (対パー: '+diffStr+')'+
     (r.totalPutts !== null ? '\n合計パット: '+r.totalPutts : '')+
+    clubInfo+
     '\n\nホール別詳細:\n'+holeLines;
 
   var prompt = '以下のゴルフラウンド記録を分析してください。挨拶・前置き・締めの言葉は不要です。結論から簡潔に記載してください。\n\n'+
@@ -1831,7 +1993,8 @@ function analyzeRound(){
     '2. 【スコア分析】前半・後半の流れ、良かったホール・苦しんだホール\n'+
     '3. 【パット分析】パット数から見えること（データがある場合のみ）\n'+
     '4. 【スイング傾向】動画解析から見える共通課題（データがある場合のみ）\n'+
-    '5. 【今後の課題】次のラウンドへ最優先で取り組むべき2点\n\n'+
+    '5. 【クラブセッティング評価】使用クラブ構成への所見・改善提案（データがある場合のみ）\n'+
+    '6. 【今後の課題】次のラウンドへ最優先で取り組むべき2点\n\n'+
     '各項目は簡潔に。余計な言葉は不要です。';
 
   fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+key, {
@@ -1869,6 +2032,14 @@ function saveEdit(){
     r.roundName=(document.getElementById('em-round')||{value:''}).value.trim()||'';
     r.course=(document.getElementById('em-course')||{value:'名称未設定'}).value.trim()||'名称未設定';
     r.date=(document.getElementById('em-date')||{value:fmtDate()}).value||fmtDate();
+    r.clubs=(document.getElementById('em-clubs')||{value:''}).value.trim()||'';
+    r.clubData={
+      driver:(document.getElementById('em-club-driver')||{value:''}).value.trim(),
+      wood:(document.getElementById('em-club-wood')||{value:''}).value.trim(),
+      ut:(document.getElementById('em-club-ut')||{value:''}).value.trim(),
+      iron:(document.getElementById('em-club-iron')||{value:''}).value.trim(),
+      putter:(document.getElementById('em-club-putter')||{value:''}).value.trim()
+    };
     var parEl=document.getElementById('em-par');
     var total=0,filled=0,totalPutts=0,hasPutts=false;
     var holes=[];
@@ -2048,9 +2219,16 @@ function analyzeGrowth(){
   var roundSummaries = reviewedRecords.map(function(r, i){
     var diff = r.total - r.par;
     var diffStr = diff===0?'イーブン':(diff>0?'+'+diff:''+diff);
+    var clubLine = '';
+    if(r.clubData && Object.values(r.clubData).some(Boolean)){
+      clubLine = '\nクラブ: '+[r.clubData.driver,r.clubData.wood,r.clubData.ut,r.clubData.iron,r.clubData.putter].filter(Boolean).join(' / ');
+    } else if(r.clubs){
+      clubLine = '\nクラブ: '+r.clubs;
+    }
     return '【ラウンド'+(i+1)+' / '+dispDate(r.date)+' / '+(r.roundName||r.course)+'】\n'+
       'スコア: '+r.total+' ('+diffStr+')'+
-      (r.totalPutts!==null?' / パット: '+r.totalPutts:'') +'\n'+
+      (r.totalPutts!==null?' / パット: '+r.totalPutts:'')+
+      clubLine+'\n'+
       'AI総評:\n'+r.aiReview;
   }).join('\n\n---\n\n');
 
@@ -2066,7 +2244,8 @@ function analyzeGrowth(){
     '2. 【改善されたこと】以前と比べて良くなってきた点\n'+
     '3. 【継続している課題】複数のラウンドで共通して見られる課題\n'+
     '4. 【現在の状態】今のゴルフの総合的な状態・レベル\n'+
-    '5. 【次のステップ】今最も取り組むべきこと\n\n'+
+    '5. 【クラブセッティングの傾向】ラウンドを通じたクラブ構成への所見・改善提案（データがある場合のみ）\n'+
+    '6. 【次のステップ】今最も取り組むべきこと\n\n'+
     '挨拶・前置き・締めの言葉は不要です。各項目を簡潔に記載してください。';
 
   fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+key, {
@@ -2308,6 +2487,143 @@ function deleteAllRecords(){
 // ---- Goal Score ----
 var goalScore = parseInt(localStorage.getItem('golflog_goal')) || null;
 
+// ---- Club Settings ----
+var CLUB_KEYS = ['driver','wood','ut','iron','putter'];
+var CLUB_LABELS = {driver:'ドライバー', wood:'フェアウェイウッド', ut:'ユーティリティ', iron:'アイアン・ウェッジ', putter:'パター'};
+
+function countClubs(data){
+  var total = 0;
+  CLUB_KEYS.forEach(function(k){
+    if(!data[k]) return;
+    total += data[k].split(',').map(function(s){return s.trim();}).filter(Boolean).length;
+  });
+  return total;
+}
+
+function saveDefaultClubsNew(){
+  var data = {};
+  CLUB_KEYS.forEach(function(k){ data[k] = document.getElementById('dc-'+k).value.trim(); });
+  var count = countClubs(data);
+  if(count > 14){
+    alert('クラブは14本以内にしてください（現在' + count + '本）');
+    return;
+  }
+  localStorage.setItem('golflog_clubs_v2', JSON.stringify(data));
+  renderClubDisplay();
+  toggleClubEdit();
+  document.getElementById('f-clubs').value = buildClubString(data);
+}
+
+function buildClubString(data){
+  return CLUB_KEYS.map(function(k){ return data[k]||''; }).filter(Boolean).join(',');
+}
+
+function getDefaultClubData(){
+  try{ return JSON.parse(localStorage.getItem('golflog_clubs_v2')||'{}'); }
+  catch(e){ return {}; }
+}
+
+function renderClubDisplay(){
+  var data = getDefaultClubData();
+  var el = document.getElementById('club-display');
+  if(!el) return;
+  var hasAny = CLUB_KEYS.some(function(k){ return data[k]; });
+  var count = countClubs(data);
+  var countColor = count > 14 ? '#A32D2D' : count === 14 ? '#0F6E56' : '#555';
+  var countBadge = hasAny ?
+    '<span style="font-size:12px;font-weight:600;color:'+countColor+';">'+count+'/14本'+( count>14?' ⚠️超過':'')+' </span>' : '';
+  if(!hasAny){ el.innerHTML='<div style="font-size:13px;color:#aaa;padding:4px 0">未設定</div>'; return; }
+  el.innerHTML =
+    '<div style="margin-bottom:8px">'+countBadge+'</div>'+
+    CLUB_KEYS.map(function(k){
+      if(!data[k]) return '';
+      var num = data[k].split(',').map(function(s){return s.trim();}).filter(Boolean).length;
+      return '<div style="display:flex;gap:8px;padding:4px 0;border-bottom:0.5px solid #f0f0eb;font-size:13px;align-items:center">'+
+        '<span style="color:#888;font-weight:500;min-width:120px;font-size:11px">'+CLUB_LABELS[k]+'</span>'+
+        '<span style="color:#1a1a1a;font-weight:500;flex:1">'+data[k]+'</span>'+
+        '<span style="font-size:10px;color:#aaa">'+num+'本</span>'+
+      '</div>';
+    }).join('');
+}
+
+function toggleClubEdit(){
+  var area = document.getElementById('club-edit-area');
+  var btn = document.getElementById('club-edit-btn');
+  var isHidden = area.style.display === 'none';
+  if(isHidden){
+    // 編集エリアを開いて現在の値を読み込む
+    var data = getDefaultClubData();
+    CLUB_KEYS.forEach(function(k){
+      var el = document.getElementById('dc-'+k);
+      if(el) el.value = data[k]||'';
+    });
+    area.style.display = 'block';
+    btn.textContent = '✕ 閉じる';
+  } else {
+    area.style.display = 'none';
+    btn.textContent = '✏️ 編集する';
+  }
+}
+
+function syncClubFields(){
+  // カテゴリ入力 → hidden f-clubs に集約
+  var parts = [
+    document.getElementById('f-club-driver').value.trim(),
+    document.getElementById('f-club-wood').value.trim(),
+    document.getElementById('f-club-ut').value.trim(),
+    document.getElementById('f-club-iron').value.trim(),
+    document.getElementById('f-club-putter').value.trim()
+  ].filter(Boolean).join(',');
+  document.getElementById('f-clubs').value = parts;
+  updateClubCount();
+}
+
+function syncEmClubFields(){
+  var parts = [
+    document.getElementById('em-club-driver').value.trim(),
+    document.getElementById('em-club-wood').value.trim(),
+    document.getElementById('em-club-ut').value.trim(),
+    document.getElementById('em-club-iron').value.trim(),
+    document.getElementById('em-club-putter').value.trim()
+  ].filter(Boolean).join(',');
+  document.getElementById('em-clubs').value = parts;
+  // 本数カウント
+  var count = parts ? parts.split(',').map(function(s){return s.trim();}).filter(Boolean).length : 0;
+  var el = document.getElementById('em-clubs-count');
+  if(el){
+    el.textContent = count > 0 ? count+'/14本' : '';
+    el.style.color = count > 14 ? '#A32D2D' : count === 14 ? '#0F6E56' : '#555';
+  }
+}
+
+function setClubCategoryFields(prefix, clubStr){
+  // カンマ区切りの文字列をカテゴリ別に振り分ける（保存済みデータから）
+  // golflog_clubs_v2 のカテゴリデータがあればそちらを優先
+  var data = getDefaultClubData();
+  document.getElementById(prefix+'-driver').value = data.driver||'';
+  document.getElementById(prefix+'-wood').value = data.wood||'';
+  document.getElementById(prefix+'-ut').value = data.ut||'';
+  document.getElementById(prefix+'-iron').value = data.iron||'';
+  document.getElementById(prefix+'-putter').value = data.putter||'';
+}
+
+function loadDefaultClubs(){
+  var data = getDefaultClubData();
+  document.getElementById('f-club-driver').value = data.driver||'';
+  document.getElementById('f-club-wood').value = data.wood||'';
+  document.getElementById('f-club-ut').value = data.ut||'';
+  document.getElementById('f-club-iron').value = data.iron||'';
+  document.getElementById('f-club-putter').value = data.putter||'';
+  syncClubFields();
+}
+
+function saveDefaultClubs(){} // 旧関数（互換性のため残す）
+
+function initDefaultClubs(){
+  renderClubDisplay();
+  loadDefaultClubs();
+}
+
 function saveGoal(){
   var v = parseInt(document.getElementById('goal-score').value);
   var msg = document.getElementById('goal-msg');
@@ -2339,6 +2655,7 @@ initIDB(function(){
   initOnboard();
   initGoal();
   initApiKey();
+  initDefaultClubs();
 });
 </script>
 </body>
