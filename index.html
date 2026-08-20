@@ -1556,12 +1556,14 @@ function diffInfo(d){ if(d===0)return{t:'イーブン',cls:'deven'}; return{t:(d
 
 function renderList(){
   var el=document.getElementById('list-body');
-  var q = (document.getElementById('search-input')||{value:''}).value.trim().toLowerCase();
+  if(!el) return;
+  var searchEl = document.getElementById('search-input');
+  var q = searchEl ? searchEl.value.trim().toLowerCase() : '';
   var displayRecords = q ? records.filter(function(r){
     return (r.course||'').toLowerCase().indexOf(q)>-1 ||
            (r.roundName||'').toLowerCase().indexOf(q)>-1 ||
            (r.date||'').indexOf(q)>-1;
-  }) : records;
+  }) : records.slice();
 
   if(!displayRecords.length){
     el.innerHTML = q
@@ -1569,7 +1571,7 @@ function renderList(){
       : '<div class="card empty"><div class="empty-icon">⛳</div><div class="empty-title">記録がありません</div><div class="empty-sub">最初のラウンドを記録しましょう</div><button class="btn-save-all" style="max-width:180px;margin:0 auto;display:block" onclick="startNewRound()">＋ 記録を追加</button></div>';
     return;
   }
-  el.innerHTML=displayRecords.slice().sort(function(a,b){
+  el.innerHTML=displayRecords.sort(function(a,b){
     var da=a.date.replace(/\//g,'-'), db=b.date.replace(/\//g,'-');
     return da>db?-1:da<db?1:0;
   }).map(function(r){
