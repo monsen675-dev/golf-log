@@ -475,10 +475,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="field">
         <label style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           クラブセッティング
-          <div style="display:flex;align-items:center;gap:8px">
-            <span id="em-clubs-count" style="font-size:11px;font-weight:600;color:#555"></span>
-            <button onclick="loadDefaultClubsEm()" style="font-size:11px;color:#378ADD;background:none;border:none;cursor:pointer;font-weight:500;padding:0">↩ デフォルト</button>
-          </div>
+          <span id="em-clubs-count" style="font-size:11px;font-weight:600;color:#555"></span>
         </label>
         <div style="display:grid;gap:6px">
           <div style="display:flex;align-items:center;gap:8px">
@@ -619,6 +616,14 @@ function idbDelete(id, cb){
   });
 }
 
+function idbGetAll(cb){
+  initIDB(function(){
+    var tx = idb.transaction(IDB_STORE,'readonly');
+    var req = tx.objectStore(IDB_STORE).getAll();
+    req.onsuccess = function(){ cb(req.result||[]); };
+    req.onerror = function(){ cb([]); };
+  });
+}
 
 // メディアIDを生成
 function genMediaId(){ return 'media_'+ Date.now() +'_'+ Math.random().toString(36).substr(2,6); }
@@ -698,6 +703,8 @@ function setHolePar(n, p){
   document.getElementById('f-par').value = total;
   updateTotals();
 }
+function scoreDiff(score, par){ return score-par; }
+function badgeCls(d){ if(d<=-3)return'b-eagle'; if(d===-2)return'b-eagle'; if(d===-1)return'b-birdie'; if(d===0)return'b-par'; if(d===1)return'b-bogey'; return'b-dbl'; }
 function badgeLabel(d){ if(d<=-3)return'Albatross'; if(d===-2)return'Eagle'; if(d===-1)return'Birdie'; if(d===0)return'Par'; if(d===1)return'Bogey'; if(d===2)return'Dbl Bogey'; if(d===3)return'Tri Bogey'; if(d===4)return'+4'; if(d===5)return'+5'; return'+'+d; }
 
 // ---- Build hole UI ----
@@ -991,8 +998,6 @@ function formatAnalysisHtml(text){
   return text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/【(.*?)】/g, '<span style="font-weight:600;color:#0C447C">【$1】</span>')
-    .replace(/^[\*\-\・\•]\s*/gm, '・')
-    .replace(/^\d+\.\s+/gm, function(m){ return m; })
     .replace(/\n/g, '<br>');
 }
 
@@ -1078,7 +1083,7 @@ function analyzeSwing(n, idx){
 }
 
 function analyzeSwingEm(n, idx){
-  var urls = emVideoUrls && window.emVideoUrls[n];
+  var urls = window.emVideoUrls && window.emVideoUrls[n];
   if(!urls||!urls[idx]) return;
   var resultEl = document.getElementById('em-analysis-'+n+'-'+idx);
   // 編集モーダルではholesデータから取得
@@ -1097,9 +1102,11 @@ function analyzeSwingEm(n, idx){
   }, urls[idx].videoFileId||null, contextPrompt);
 }
 var urlModalHole = null;
+var urlModalFile = null;
 
 function openUrlModal(n){
   urlModalHole = n;
+  urlModalFile = null;
   document.getElementById('url-modal-input').value = '';
   document.getElementById('url-modal-hint').textContent = '';
   document.getElementById('url-modal').classList.add('on');
@@ -1110,6 +1117,7 @@ function closeUrlModal(){
   document.getElementById('url-modal').classList.remove('on');
   urlModalHole = null;
   emUrlModalHole = null;
+  urlModalFile = null;
 }
 
 function confirmUrlModal(){
@@ -1119,7 +1127,7 @@ function confirmUrlModal(){
   var entry = {raw: raw, embed: gdriveDirect(raw)};
   if(emUrlModalHole !== null){
     var n = emUrlModalHole;
-    if(!emVideoUrls) window.emVideoUrls = {};
+    if(!window.emVideoUrls) window.emVideoUrls = {};
     if(!window.emVideoUrls[n]) window.emVideoUrls[n] = [];
     window.emVideoUrls[n].push(entry);
     renderEmUrlList(n);
@@ -1144,6 +1152,17 @@ function gdriveDirect(url){
   return url;
 }
 
+function confirmUrlModal(){
+  var raw = document.getElementById('url-modal-input').value.trim();
+  var hint = document.getElementById('url-modal-hint');
+  if(!raw){ hint.textContent = '⚠️ URLを入力してください'; hint.style.color='#A32D2D'; return; }
+  var n = urlModalHole;
+  if(!currentHoleData[n-1].videoUrls) currentHoleData[n-1].videoUrls = [];
+  currentHoleData[n-1].videoUrls.push({raw: raw, embed: gdriveDirect(raw)});
+  renderUrlList(n);
+  document.getElementById('hcmt-btn-'+n).classList.add('has-comment');
+  closeUrlModal();
+}
 
 function renderUrlList(n){
   var el = document.getElementById('url-list-'+n);
@@ -1151,6 +1170,7 @@ function renderUrlList(n){
   var urls = currentHoleData[n-1].videoUrls || [];
   if(!urls.length){ el.innerHTML=''; return; }
   // プリロード開始
+  urls.forEach(function(u){ preloadVideoUrl(u.embed); });
   el.innerHTML = urls.map(function(u, idx){
     return '<div class="video-link-thumb" style="flex-direction:column;align-items:stretch;gap:6px">'+
       '<div style="display:flex;align-items:center;gap:8px">'+
@@ -1175,7 +1195,17 @@ function deleteVideoUrl(event, n, idx){
 }
 
 // プリロード済みiframeを管理
+var preloadedIframes = {};
 
+function preloadVideoUrl(embedUrl){
+  if(preloadedIframes[embedUrl]) return; // 既にプリロード済み
+  var iframe = document.createElement('iframe');
+  iframe.src = embedUrl;
+  iframe.style.cssText = 'width:1px;height:1px;border:none;opacity:0';
+  iframe.setAttribute('data-embed', embedUrl);
+  document.getElementById('preload-container').appendChild(iframe);
+  preloadedIframes[embedUrl] = iframe;
+}
 
 function openVideoUrl(embedUrl){
   var content = document.getElementById('media-viewer-content');
@@ -1269,6 +1299,21 @@ function closeMediaViewer(){
 }
 
 // ホール読み込み時にIndexedDBからメディアを復元
+function loadMediaForHole(holeData, n, cb){
+  var ids = holeData.mediaIds || [];
+  if(!ids.length){ holeData.mediaItems = []; cb(); return; }
+  var items = [], pending = ids.length;
+  ids.forEach(function(id, i){
+    idbGet(id, function(item){
+      items[i] = item;
+      pending--;
+      if(pending === 0){
+        holeData.mediaItems = items.filter(function(x){return x!==null;});
+        cb();
+      }
+    });
+  });
+}
 
 // 漢数字・数詞→数字変換
 var kanjiMap = {'零':0,'〇':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
@@ -1306,7 +1351,7 @@ function onEmMediaSelected(n, input){
     var id = genMediaId();
     var item = { id: id, type: file.type.startsWith('video') ? 'video' : 'image', data: e.target.result, name: file.name };
     idbSave(item, function(){
-      if(!emMedia) window.emMedia = {};
+      if(!window.emMedia) window.emMedia = {};
       if(!window.emMedia[n]) window.emMedia[n] = {ids:[], items:[]};
       window.emMedia[n].ids.push(id);
       window.emMedia[n].items.push(item);
@@ -1320,7 +1365,7 @@ function onEmMediaSelected(n, input){
 function renderEmMediaGrid(n){
   var grid = document.getElementById('em-media-grid-'+n);
   if(!grid) return;
-  var em = emMedia && window.emMedia[n];
+  var em = window.emMedia && window.emMedia[n];
   var items = em ? em.items : [];
   if(!items.length){ grid.innerHTML = ''; return; }
   grid.innerHTML = items.map(function(item, idx){
@@ -1345,11 +1390,63 @@ function openEmUrlModal(n){
   setTimeout(function(){ document.getElementById('url-modal-input').focus(); }, 100);
 }
 
+function confirmUrlModal(){
+  var raw = document.getElementById('url-modal-input').value.trim();
+  var hint = document.getElementById('url-modal-hint');
+  if(!raw){ hint.textContent = '⚠️ URLを入力してください'; hint.style.color='#A32D2D'; return; }
+
+  var videoId = urlModalFile ? genMediaId() : null;
+  var entry = {raw: raw, embed: gdriveDirect(raw), videoFileId: videoId};
+
+  function finalize(n){
+    if(!currentHoleData[n-1].videoUrls) currentHoleData[n-1].videoUrls = [];
+    currentHoleData[n-1].videoUrls.push(entry);
+    renderUrlList(n);
+    document.getElementById('hcmt-btn-'+n).classList.add('has-comment');
+    closeUrlModal();
+  }
+
+  if(emUrlModalHole !== null){
+    var n = emUrlModalHole;
+    if(!window.emVideoUrls) window.emVideoUrls = {};
+    if(!window.emVideoUrls[n]) window.emVideoUrls[n] = [];
+    if(urlModalFile && videoId){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        idbSave({id: videoId, type: 'video', data: e.target.result, name: urlModalFile.name}, function(){
+          window.emVideoUrls[n].push(entry);
+          renderEmUrlList(n);
+          closeUrlModal();
+          emUrlModalHole = null;
+        });
+      };
+      reader.readAsDataURL(urlModalFile);
+    } else {
+      window.emVideoUrls[n].push(entry);
+      renderEmUrlList(n);
+      closeUrlModal();
+      emUrlModalHole = null;
+    }
+  } else if(urlModalHole !== null){
+    var n = urlModalHole;
+    if(urlModalFile && videoId){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        idbSave({id: videoId, type: 'video', data: e.target.result, name: urlModalFile.name}, function(){
+          finalize(n);
+        });
+      };
+      reader.readAsDataURL(urlModalFile);
+    } else {
+      finalize(n);
+    }
+  }
+}
 
 function renderEmUrlList(n){
   var el = document.getElementById('em-url-list-'+n);
   if(!el) return;
-  var urls = (emVideoUrls && window.emVideoUrls[n]) || [];
+  var urls = (window.emVideoUrls && window.emVideoUrls[n]) || [];
   if(!urls.length){ el.innerHTML=''; return; }
   el.innerHTML = urls.map(function(u, idx){
     var analysisId = 'em-analysis-'+n+'-'+idx;
@@ -1372,12 +1469,12 @@ function renderEmUrlList(n){
 }
 
 function deleteEmVideoUrl(n, idx){
-  if(emVideoUrls && window.emVideoUrls[n]) window.emVideoUrls[n].splice(idx, 1);
+  if(window.emVideoUrls && window.emVideoUrls[n]) window.emVideoUrls[n].splice(idx, 1);
   renderEmUrlList(n);
 }
 
 function deleteEmMedia(n, idx){
-  var em = emMedia && window.emMedia[n];
+  var em = window.emMedia && window.emMedia[n];
   if(!em) return;
   var item = em.items[idx];
   if(item && item.id) idbDelete(item.id);
@@ -1636,9 +1733,9 @@ function openEdit(id){
     var cmt=r.holes[i]&&r.holes[i].comment?r.holes[i].comment:'';
     var existingMediaIds=r.holes[i]&&r.holes[i].mediaIds?r.holes[i].mediaIds:[];
     var existingVideoUrls=r.holes[i]&&r.holes[i].videoUrls?r.holes[i].videoUrls:[];
-    if(!emMedia) emMedia={};
+    if(!window.emMedia) window.emMedia={};
     window.emMedia[n]={ids:existingMediaIds.slice(), items:[]};
-    if(!emVideoUrls) emVideoUrls={};
+    if(!window.emVideoUrls) window.emVideoUrls={};
     window.emVideoUrls[n]=existingVideoUrls.slice();
     html+='<div style="margin-bottom:8px;padding:10px;background:#f9f9f6;border:1px solid #e8e8e0;border-radius:10px">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
@@ -1686,7 +1783,7 @@ function openEdit(id){
   document.getElementById('edit-modal').classList.add('on');
 }
 
-function closeModal(){ document.getElementById('edit-modal').classList.remove('on'); editingId=null; emMedia={}; emVideoUrls={}; }
+function closeModal(){ document.getElementById('edit-modal').classList.remove('on'); editingId=null; window.emMedia={}; window.emVideoUrls={}; }
 
 function openDetail(id){
   var r=records.find(function(x){return x.id===id;});
@@ -1758,6 +1855,7 @@ function openDetail(id){
     var videoUrlHtml='';
     if(h.videoUrls&&h.videoUrls.length){
       // プリロード開始
+      h.videoUrls.forEach(function(u){ preloadVideoUrl(u.embed); });
       videoUrlHtml='<div style="margin-top:6px">'+h.videoUrls.map(function(u,vi){
         var analysisHtml = u.analysis ?
           makeAnalysisBlock(formatAnalysisHtml(u.analysis), 'dm-analysis-'+i+'-'+vi) : '';
@@ -1956,9 +2054,9 @@ function saveEdit(){
       var ob=obvEl&&obvEl.value?parseInt(obvEl.value):0;
       var hp=hpvEl&&hpvEl.value?parseInt(hpvEl.value):4;
       var cmt=cmtvEl?cmtvEl.value.trim():'';
-      var em=emMedia&&window.emMedia[i];
+      var em=window.emMedia&&window.emMedia[i];
       var mediaIds=em?em.ids:[];
-      var videoUrls=(emVideoUrls&&window.emVideoUrls[i])?window.emVideoUrls[i]:[];
+      var videoUrls=(window.emVideoUrls&&window.emVideoUrls[i])?window.emVideoUrls[i]:[];
       holes.push({par:hp,score:score,putts:putts,ob:ob,comment:cmt,mediaIds:mediaIds,videoUrls:videoUrls});
       if(score!==null){total+=score;filled++;}
       if(putts!==null){totalPutts+=putts;hasPutts=true;}
@@ -2078,120 +2176,7 @@ function renderStats(){
     '<div style="font-size:10px;color:#aaa;margin-top:6px">* 9ホール未満の入力</div>'+
   '</div>'+
   makeCharts(sorted)+
-  makeHoleAnalysis()+
   makeGrowthCard();
-}
-
-function makeHoleAnalysis(){
-  if(records.length < 1) return '';
-
-  // 18ホール分のスコア集計
-  var holeStats = [];
-  for(var i=0;i<18;i++){
-    var scores=[], diffs=[], pars=[];
-    records.forEach(function(r){
-      var h = r.holes[i];
-      if(h && h.score !== null){
-        scores.push(h.score);
-        diffs.push(h.score - (h.par||4));
-        pars.push(h.par||4);
-      }
-    });
-    if(scores.length === 0){ holeStats.push(null); continue; }
-    var avg = scores.reduce(function(a,b){return a+b;},0)/scores.length;
-    var avgDiff = diffs.reduce(function(a,b){return a+b;},0)/diffs.length;
-    var avgPar = pars.reduce(function(a,b){return a+b;},0)/pars.length;
-    holeStats.push({
-      n: i+1, avg: avg, avgDiff: avgDiff, avgPar: Math.round(avgPar),
-      count: scores.length,
-      eagles: diffs.filter(function(d){return d<=-2;}).length,
-      birdies: diffs.filter(function(d){return d===-1;}).length,
-      pars: diffs.filter(function(d){return d===0;}).length,
-      bogeys: diffs.filter(function(d){return d===1;}).length,
-      doubles: diffs.filter(function(d){return d>=2;}).length
-    });
-  }
-
-  var validHoles = holeStats.filter(function(h){return h!==null;});
-  if(validHoles.length === 0) return '';
-
-  // ワースト・ベストTop3
-  var sorted = validHoles.slice().sort(function(a,b){return b.avgDiff-a.avgDiff;});
-  var worst3 = sorted.slice(0,3);
-  var best3 = sorted.slice(-3).reverse();
-
-  // Par別平均
-  var par3s = validHoles.filter(function(h){return h.avgPar===3;});
-  var par4s = validHoles.filter(function(h){return h.avgPar===4;});
-  var par5s = validHoles.filter(function(h){return h.avgPar===5;});
-  function avgDiffOf(holes){
-    if(!holes.length) return null;
-    return holes.reduce(function(a,h){return a+h.avgDiff;},0)/holes.length;
-  }
-  var p3avg=avgDiffOf(par3s), p4avg=avgDiffOf(par4s), p5avg=avgDiffOf(par5s);
-
-  function diffColor(d){ return d<0?'#0F6E56':d===0?'#555':'#A32D2D'; }
-  function diffStr(d){ return (d>0?'+':'')+d.toFixed(1); }
-  function badgeRow(h){
-    var bc = badgeCls(Math.round(h.avgDiff));
-    return '<tr style="border-bottom:0.5px solid #f0f0eb">'+
-      '<td style="padding:7px 6px;font-size:13px;font-weight:600">'+h.n+'H</td>'+
-      '<td style="padding:7px 6px;font-size:11px;color:#888">Par'+h.avgPar+'</td>'+
-      '<td style="padding:7px 6px;font-size:13px;font-weight:600;color:'+diffColor(h.avgDiff)+'">'+diffStr(h.avgDiff)+'</td>'+
-      '<td style="padding:7px 6px;font-size:12px;color:#555">'+h.avg.toFixed(1)+'打</td>'+
-      '<td style="padding:7px 6px;font-size:11px;color:#888">'+h.count+'R</td>'+
-    '</tr>';
-  }
-
-  // 全18ホールの表
-  var allRows = holeStats.map(function(h,i){
-    if(!h) return '<tr><td colspan="5" style="padding:6px;color:#ddd;font-size:12px">'+(i+1)+'H — データなし</td></tr>';
-    var bc = h.avgDiff < -0.5 ? '#EAF3DE' : h.avgDiff > 0.5 ? '#FCEBEB' : '#f9f9f6';
-    return '<tr style="border-bottom:0.5px solid #f0f0eb;background:'+bc+'">'+
-      '<td style="padding:7px 6px;font-size:13px;font-weight:600">'+h.n+'H</td>'+
-      '<td style="padding:7px 6px;font-size:11px;color:#888">Par'+h.avgPar+'</td>'+
-      '<td style="padding:7px 6px;font-size:13px;font-weight:700;color:'+diffColor(h.avgDiff)+'">'+diffStr(h.avgDiff)+'</td>'+
-      '<td style="padding:7px 6px;font-size:12px;color:#555">'+h.avg.toFixed(1)+'打</td>'+
-      '<td style="padding:7px 6px;font-size:10px;color:#aaa">'+
-        (h.birdies>0?'🟢×'+h.birdies+' ':'')+
-        (h.pars>0?'⬜×'+h.pars+' ':'')+
-        (h.bogeys>0?'🟡×'+h.bogeys+' ':'')+
-        (h.doubles>0?'🔴×'+h.doubles:'')+'</td>'+
-    '</tr>';
-  }).join('');
-
-  return '<div class="chart-wrap" style="margin-top:10px">'+
-    '<div class="chart-lbl">📊 ホール別分析</div>'+
-
-    // Par別平均
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">'+
-      (p3avg!==null?'<div class="sh"><div class="sh-lbl">Par3 平均</div><div class="sh-val" style="font-size:18px;color:'+diffColor(p3avg)+'">'+diffStr(p3avg)+'</div></div>':'')+
-      (p4avg!==null?'<div class="sh"><div class="sh-lbl">Par4 平均</div><div class="sh-val" style="font-size:18px;color:'+diffColor(p4avg)+'">'+diffStr(p4avg)+'</div></div>':'')+
-      (p5avg!==null?'<div class="sh"><div class="sh-lbl">Par5 平均</div><div class="sh-val" style="font-size:18px;color:'+diffColor(p5avg)+'">'+diffStr(p5avg)+'</div></div>':'')+
-    '</div>'+
-
-    // 苦手・得意Top3
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'+
-      '<div><div style="font-size:11px;font-weight:600;color:#A32D2D;margin-bottom:4px">😰 苦手ホールTop3</div>'+
-        '<table style="width:100%;border-collapse:collapse">'+worst3.map(badgeRow).join('')+'</table></div>'+
-      '<div><div style="font-size:11px;font-weight:600;color:#0F6E56;margin-bottom:4px">😊 得意ホールTop3</div>'+
-        '<table style="width:100%;border-collapse:collapse">'+best3.map(badgeRow).join('')+'</table></div>'+
-    '</div>'+
-
-    // 全ホール一覧
-    '<div style="font-size:11px;font-weight:600;color:#555;margin-bottom:6px">全ホール一覧</div>'+
-    '<table style="width:100%;border-collapse:collapse">'+
-      '<thead><tr style="border-bottom:1px solid #ebebeb">'+
-        '<th style="padding:5px 6px;font-size:10px;color:#aaa;font-weight:600;text-align:left">H</th>'+
-        '<th style="padding:5px 6px;font-size:10px;color:#aaa;font-weight:600;text-align:left">Par</th>'+
-        '<th style="padding:5px 6px;font-size:10px;color:#aaa;font-weight:600;text-align:left">平均差</th>'+
-        '<th style="padding:5px 6px;font-size:10px;color:#aaa;font-weight:600;text-align:left">平均打</th>'+
-        '<th style="padding:5px 6px;font-size:10px;color:#aaa;font-weight:600;text-align:left">内訳</th>'+
-      '</tr></thead>'+
-      '<tbody>'+allRows+'</tbody>'+
-    '</table>'+
-    '<div style="font-size:10px;color:#aaa;margin-top:6px">🟢バーディ以上 ⬜パー 🟡ボギー 🔴ダブル以上</div>'+
-  '</div>';
 }
 
 function makeGrowthCard(){
@@ -2386,8 +2371,7 @@ function clearSearch(){
   renderList();
 }
 
-
-// renderList に検索フィルターを適用
+// renderList に検索フィルターを適用（既存関数を上書き）
 var _origRenderList = renderList;
 renderList = function(){
   var q = (document.getElementById('search-input')||{value:''}).value.trim().toLowerCase();
@@ -2402,8 +2386,10 @@ renderList = function(){
     el.innerHTML='<div class="card empty"><div class="empty-icon">🔍</div><div class="empty-title">「'+q+'」に一致する記録がありません</div></div>';
     return;
   }
+  // 一時的に records を filtered に差し替えて描画
   var orig=records; records=filtered; _origRenderList(); records=orig;
 };
+
 // ---- Onboarding ----
 function initOnboard(){
   var dismissed=localStorage.getItem('golflog_onboard_dismissed');
@@ -2501,26 +2487,7 @@ function deleteAllRecords(){
 // ---- Goal Score ----
 var goalScore = parseInt(localStorage.getItem('golflog_goal')) || null;
 
-// ---- Storage Monitor ----
-function checkStorageUsage(){
-  var el = document.getElementById('storage-warn');
-  if(!el) return;
-  try{
-    var used = 0;
-    for(var k in localStorage){ if(localStorage.hasOwnProperty(k)) used += localStorage[k].length * 2; }
-    var usedMB = (used / 1024 / 1024).toFixed(2);
-    var pct = Math.round(used / (5*1024*1024) * 100);
-    if(pct >= 80){
-      el.innerHTML = '<div style="background:#FCEBEB;border:1px solid #F7C1C1;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#A32D2D">'+
-        '⚠️ ストレージ使用量が多くなっています（'+usedMB+'MB / 約5MB）<br>'+
-        '「データ」タブからJSONエクスポートして古い記録を削除することをお勧めします。</div>';
-    } else if(pct >= 50){
-      el.innerHTML = '<div style="font-size:11px;color:#888;margin-bottom:8px;text-align:right">💾 ストレージ: '+usedMB+'MB使用中（約'+pct+'%）</div>';
-    } else {
-      el.innerHTML = '<div style="font-size:11px;color:#aaa;margin-bottom:8px;text-align:right">💾 '+usedMB+'MB / 約5MB</div>';
-    }
-  }catch(e){}
-}
+// ---- Club Settings ----
 var CLUB_KEYS = ['driver','wood','ut','iron','putter'];
 var CLUB_LABELS = {driver:'ドライバー', wood:'フェアウェイウッド', ut:'ユーティリティ', iron:'アイアン・ウェッジ', putter:'パター'};
 
@@ -2629,15 +2596,15 @@ function syncEmClubFields(){
   }
 }
 
-
-function loadDefaultClubsEm(){
+function setClubCategoryFields(prefix, clubStr){
+  // カンマ区切りの文字列をカテゴリ別に振り分ける（保存済みデータから）
+  // golflog_clubs_v2 のカテゴリデータがあればそちらを優先
   var data = getDefaultClubData();
-  document.getElementById('em-club-driver').value = data.driver||'';
-  document.getElementById('em-club-wood').value = data.wood||'';
-  document.getElementById('em-club-ut').value = data.ut||'';
-  document.getElementById('em-club-iron').value = data.iron||'';
-  document.getElementById('em-club-putter').value = data.putter||'';
-  syncEmClubFields();
+  document.getElementById(prefix+'-driver').value = data.driver||'';
+  document.getElementById(prefix+'-wood').value = data.wood||'';
+  document.getElementById(prefix+'-ut').value = data.ut||'';
+  document.getElementById(prefix+'-iron').value = data.iron||'';
+  document.getElementById(prefix+'-putter').value = data.putter||'';
 }
 
 function loadDefaultClubs(){
@@ -2650,6 +2617,7 @@ function loadDefaultClubs(){
   syncClubFields();
 }
 
+function saveDefaultClubs(){} // 旧関数（互換性のため残す）
 
 function initDefaultClubs(){
   renderClubDisplay();
