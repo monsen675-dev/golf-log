@@ -367,7 +367,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <!-- 統計 -->
 <div id="s-stats" class="sec">
-  <div id="storage-warn"></div>
   <div class="stats-grid" id="sg"></div>
   <div id="ca"></div>
   <!-- クラブセッティング -->
@@ -570,18 +569,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <script>
-var GEMINI_MODEL = 'gemini-3.5-flash';
 var records = JSON.parse(localStorage.getItem('golflog_v2') || '[]');
 var lastWeather = null, lastGps = null;
 var editingId = null;
 var currentHoleData = [];
-var emMedia = {};       // 編集モーダル用メディア
-var emVideoUrls = {};   // 編集モーダル用動画URL
 
 function persist(){ localStorage.setItem('golflog_v2', JSON.stringify(records)); }
 function fmtDate(){ var d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0'); }
 function dispDate(s){ return s?s.replace(/-/g,'/'):''; }
-function normDate(s){ return s?s.replace(/\//g,'-'):''; } // 全て YYYY-MM-DD に正規化
 
 // ---- IndexedDB for Media ----
 var idb = null;
@@ -1083,7 +1078,7 @@ function analyzeSwing(n, idx){
 }
 
 function analyzeSwingEm(n, idx){
-  var urls = emVideoUrls && emVideoUrls[n];
+  var urls = emVideoUrls && window.emVideoUrls[n];
   if(!urls||!urls[idx]) return;
   var resultEl = document.getElementById('em-analysis-'+n+'-'+idx);
   // 編集モーダルではholesデータから取得
@@ -1098,7 +1093,7 @@ function analyzeSwingEm(n, idx){
   }, n);
   var contextPrompt = SWING_PROMPT + '\n\n【このホールの記録】\n' + ctx;
   runAnalysis(urls[idx].raw, resultEl, function(text){
-    emVideoUrls[n][idx].analysis = text;
+    window.emVideoUrls[n][idx].analysis = text;
   }, urls[idx].videoFileId||null, contextPrompt);
 }
 var urlModalHole = null;
@@ -1124,9 +1119,9 @@ function confirmUrlModal(){
   var entry = {raw: raw, embed: gdriveDirect(raw)};
   if(emUrlModalHole !== null){
     var n = emUrlModalHole;
-    if(!emVideoUrls) emVideoUrls = {};
-    if(!emVideoUrls[n]) emVideoUrls[n] = [];
-    emVideoUrls[n].push(entry);
+    if(!emVideoUrls) window.emVideoUrls = {};
+    if(!window.emVideoUrls[n]) window.emVideoUrls[n] = [];
+    window.emVideoUrls[n].push(entry);
     renderEmUrlList(n);
     closeUrlModal();
     emUrlModalHole = null;
@@ -1311,10 +1306,10 @@ function onEmMediaSelected(n, input){
     var id = genMediaId();
     var item = { id: id, type: file.type.startsWith('video') ? 'video' : 'image', data: e.target.result, name: file.name };
     idbSave(item, function(){
-      if(!emMedia) emMedia = {};
-      if(!emMedia[n]) emMedia[n] = {ids:[], items:[]};
-      emMedia[n].ids.push(id);
-      emMedia[n].items.push(item);
+      if(!emMedia) window.emMedia = {};
+      if(!window.emMedia[n]) window.emMedia[n] = {ids:[], items:[]};
+      window.emMedia[n].ids.push(id);
+      window.emMedia[n].items.push(item);
       renderEmMediaGrid(n);
     });
   };
@@ -1325,7 +1320,7 @@ function onEmMediaSelected(n, input){
 function renderEmMediaGrid(n){
   var grid = document.getElementById('em-media-grid-'+n);
   if(!grid) return;
-  var em = emMedia && emMedia[n];
+  var em = emMedia && window.emMedia[n];
   var items = em ? em.items : [];
   if(!items.length){ grid.innerHTML = ''; return; }
   grid.innerHTML = items.map(function(item, idx){
@@ -1354,7 +1349,7 @@ function openEmUrlModal(n){
 function renderEmUrlList(n){
   var el = document.getElementById('em-url-list-'+n);
   if(!el) return;
-  var urls = (emVideoUrls && emVideoUrls[n]) || [];
+  var urls = (emVideoUrls && window.emVideoUrls[n]) || [];
   if(!urls.length){ el.innerHTML=''; return; }
   el.innerHTML = urls.map(function(u, idx){
     var analysisId = 'em-analysis-'+n+'-'+idx;
@@ -1377,12 +1372,12 @@ function renderEmUrlList(n){
 }
 
 function deleteEmVideoUrl(n, idx){
-  if(emVideoUrls && emVideoUrls[n]) emVideoUrls[n].splice(idx, 1);
+  if(emVideoUrls && window.emVideoUrls[n]) window.emVideoUrls[n].splice(idx, 1);
   renderEmUrlList(n);
 }
 
 function deleteEmMedia(n, idx){
-  var em = emMedia && emMedia[n];
+  var em = emMedia && window.emMedia[n];
   if(!em) return;
   var item = em.items[idx];
   if(item && item.id) idbDelete(item.id);
@@ -1540,15 +1535,8 @@ function saveAll(){
   var weatherSnap=null;
   if(lastWeather){var c=lastWeather.current,wi=wmoInfo(c.weather_code);weatherSnap={icon:wi.icon,label:wi.label,temp:Math.round(c.temperature_2m),wind:Math.round(c.wind_speed_10m),humid:Math.round(c.relative_humidity_2m)};}
   var gpsSnap=lastGps?{lat:lastGps.lat,lon:lastGps.lon}:null;
-  try{
-    records.unshift({id:Date.now(),roundName:roundName,course:course,date:date,par:par,clubs:clubs,clubData:clubData,holes:holes,total:totalScore,filled:filled,totalPutts:hasPutts?totalPutts:null,weather:weatherSnap,gps:gpsSnap});
-    persist();
-    clearForm();
-    go('list');
-  }catch(e){
-    console.error('saveAll error:', e);
-    alert('保存中にエラーが発生しました。もう一度試してください。');
-  }
+  records.unshift({id:Date.now(),roundName:roundName,course:course,date:date,par:par,clubs:clubs,clubData:clubData,holes:holes,total:totalScore,filled:filled,totalPutts:hasPutts?totalPutts:null,weather:weatherSnap,gps:gpsSnap});
+  persist(); clearForm(); go('list');
 }
 
 // ---- List ----
@@ -1556,22 +1544,11 @@ function diffInfo(d){ if(d===0)return{t:'イーブン',cls:'deven'}; return{t:(d
 
 function renderList(){
   var el=document.getElementById('list-body');
-  if(!el) return;
-  var searchEl = document.getElementById('search-input');
-  var q = searchEl ? searchEl.value.trim().toLowerCase() : '';
-  var displayRecords = q ? records.filter(function(r){
-    return (r.course||'').toLowerCase().indexOf(q)>-1 ||
-           (r.roundName||'').toLowerCase().indexOf(q)>-1 ||
-           (r.date||'').indexOf(q)>-1;
-  }) : records.slice();
-
-  if(!displayRecords.length){
-    el.innerHTML = q
-      ? '<div class="card empty"><div class="empty-icon">🔍</div><div class="empty-title">「'+q+'」に一致する記録がありません</div></div>'
-      : '<div class="card empty"><div class="empty-icon">⛳</div><div class="empty-title">記録がありません</div><div class="empty-sub">最初のラウンドを記録しましょう</div><button class="btn-save-all" style="max-width:180px;margin:0 auto;display:block" onclick="startNewRound()">＋ 記録を追加</button></div>';
+  if(!records.length){
+    el.innerHTML='<div class="card empty"><div class="empty-icon">⛳</div><div class="empty-title">記録がありません</div><div class="empty-sub">最初のラウンドを記録しましょう</div><button class="btn-save-all" style="max-width:180px;margin:0 auto;display:block" onclick="startNewRound()">＋ 記録を追加</button></div>';
     return;
   }
-  el.innerHTML=displayRecords.sort(function(a,b){
+  el.innerHTML=records.slice().sort(function(a,b){
     var da=a.date.replace(/\//g,'-'), db=b.date.replace(/\//g,'-');
     return da>db?-1:da<db?1:0;
   }).map(function(r){
@@ -1660,9 +1637,9 @@ function openEdit(id){
     var existingMediaIds=r.holes[i]&&r.holes[i].mediaIds?r.holes[i].mediaIds:[];
     var existingVideoUrls=r.holes[i]&&r.holes[i].videoUrls?r.holes[i].videoUrls:[];
     if(!emMedia) emMedia={};
-    emMedia[n]={ids:existingMediaIds.slice(), items:[]};
+    window.emMedia[n]={ids:existingMediaIds.slice(), items:[]};
     if(!emVideoUrls) emVideoUrls={};
-    emVideoUrls[n]=existingVideoUrls.slice();
+    window.emVideoUrls[n]=existingVideoUrls.slice();
     html+='<div style="margin-bottom:8px;padding:10px;background:#f9f9f6;border:1px solid #e8e8e0;border-radius:10px">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
         '<div style="font-size:12px;font-weight:600;color:#555">'+n+'ホール</div>'+
@@ -1692,7 +1669,7 @@ function openEdit(id){
   // 既存メディアをIndexedDBから非同期ロード
   for(var j=1;j<=18;j++){
     (function(n){
-      var em=emMedia[n];
+      var em=window.emMedia[n];
       if(!em||!em.ids||!em.ids.length) return;
       em.ids.forEach(function(id){
         idbGet(id,function(item){
@@ -1922,7 +1899,7 @@ function analyzeRound(){
     '6. 【今後の課題】次のラウンドへ最優先で取り組むべき2点\n\n'+
     '各項目は簡潔に。余計な言葉は不要です。';
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key='+key, {
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+key, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
   }).then(function(r){ return r.json(); }).then(function(data){
@@ -1979,9 +1956,9 @@ function saveEdit(){
       var ob=obvEl&&obvEl.value?parseInt(obvEl.value):0;
       var hp=hpvEl&&hpvEl.value?parseInt(hpvEl.value):4;
       var cmt=cmtvEl?cmtvEl.value.trim():'';
-      var em=emMedia&&emMedia[i];
+      var em=emMedia&&window.emMedia[i];
       var mediaIds=em?em.ids:[];
-      var videoUrls=(emVideoUrls&&emVideoUrls[i])?emVideoUrls[i]:[];
+      var videoUrls=(emVideoUrls&&window.emVideoUrls[i])?window.emVideoUrls[i]:[];
       holes.push({par:hp,score:score,putts:putts,ob:ob,comment:cmt,mediaIds:mediaIds,videoUrls:videoUrls});
       if(score!==null){total+=score;filled++;}
       if(putts!==null){totalPutts+=putts;hasPutts=true;}
@@ -2013,7 +1990,6 @@ function closeConfirm(){ document.getElementById('confirm-overlay').classList.re
 
 // ---- Stats ----
 function renderStats(){
-  checkStorageUsage();
   var sg=document.getElementById('sg');
   var ca=document.getElementById('ca');
   if(!records.length){
@@ -2287,7 +2263,7 @@ function analyzeGrowth(){
     '6. 【次のステップ】今最も取り組むべきこと\n\n'+
     '挨拶・前置き・締めの言葉は不要です。各項目を簡潔に記載してください。';
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key='+key, {
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+key, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
   }).then(function(r){ return r.json(); }).then(function(data){
@@ -2410,6 +2386,24 @@ function clearSearch(){
   renderList();
 }
 
+
+// renderList に検索フィルターを適用
+var _origRenderList = renderList;
+renderList = function(){
+  var q = (document.getElementById('search-input')||{value:''}).value.trim().toLowerCase();
+  if(!q){ _origRenderList(); return; }
+  var el=document.getElementById('list-body');
+  var filtered=records.filter(function(r){
+    return (r.course||'').toLowerCase().indexOf(q)>-1 ||
+           (r.roundName||'').toLowerCase().indexOf(q)>-1 ||
+           (r.date||'').indexOf(q)>-1;
+  });
+  if(!filtered.length){
+    el.innerHTML='<div class="card empty"><div class="empty-icon">🔍</div><div class="empty-title">「'+q+'」に一致する記録がありません</div></div>';
+    return;
+  }
+  var orig=records; records=filtered; _origRenderList(); records=orig;
+};
 // ---- Onboarding ----
 function initOnboard(){
   var dismissed=localStorage.getItem('golflog_onboard_dismissed');
