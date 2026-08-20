@@ -493,11 +493,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       🤖 AIでラウンド全体を総評する
     </button>
     <div id="dm-ai-result-wrap" style="display:none;margin-bottom:14px">
-      <div id="dm-ai-result" style="font-size:13px;color:#1a1a1a;line-height:1.8;background:#f0f8ff;border:1px solid #B5D4F4;border-radius:12px;padding:14px" class="analysis-collapsed"></div>
-      <button class="analysis-toggle" data-target="dm-ai-result" onclick="toggleAnalysis(this)" style="margin-top:4px">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        <span>すべて表示</span>
-      </button>
+      <div id="dm-ai-result" style="font-size:13px;color:#1a1a1a;line-height:1.8;background:#f0f8ff;border:1px solid #B5D4F4;border-radius:12px;padding:14px"></div>
     </div>
   </div>
 </div>
@@ -1771,10 +1767,8 @@ function openDetail(id){
   var resultWrap = document.getElementById('dm-ai-result-wrap');
   if(r.aiReview){
     resultWrap.style.display = 'block';
-    resultEl.classList.add('analysis-collapsed');
+    resultEl.classList.remove('analysis-collapsed');
     resultEl.innerHTML = formatAnalysisHtml(r.aiReview);
-    var toggleBtn = resultWrap.querySelector('.analysis-toggle span');
-    if(toggleBtn) toggleBtn.textContent = 'すべて表示';
     btn.innerHTML = '🔄 AIで再総評する';
   } else {
     resultWrap.style.display = 'none';
@@ -1896,7 +1890,7 @@ function makeAnalysisBlock(html, id){
 
 function closeDetailModal(){
   document.getElementById('detail-modal').classList.remove('on');
-  document.getElementById('dm-ai-result').style.display='none';
+  document.getElementById('dm-ai-result-wrap').style.display='none';
   document.getElementById('dm-ai-result').innerHTML='';
 }
 function openDetailMedia(type, data){ openMediaViewerData(type, data); }
@@ -1980,11 +1974,9 @@ function analyzeRound(){
     var resultWrap = document.getElementById('dm-ai-result-wrap');
     if(data.error){ resultEl.innerHTML = '⚠️ '+translateGeminiError(data.error.message); resultWrap.style.display='block'; return; }
     var text = data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '総評を取得できませんでした';
-    resultEl.classList.add('analysis-collapsed');
+    resultEl.classList.remove('analysis-collapsed');
     resultEl.innerHTML = formatAnalysisHtml(text);
     resultWrap.style.display = 'block';
-    var toggleBtn = resultWrap.querySelector('.analysis-toggle span');
-    if(toggleBtn) toggleBtn.textContent = 'すべて表示';
     var rec = records.find(function(x){ return x.id === detailRecordId; });
     if(rec){ rec.aiReview = text; persist(); }
   }).catch(function(err){
