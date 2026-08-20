@@ -1556,11 +1556,20 @@ function diffInfo(d){ if(d===0)return{t:'イーブン',cls:'deven'}; return{t:(d
 
 function renderList(){
   var el=document.getElementById('list-body');
-  if(!records.length){
-    el.innerHTML='<div class="card empty"><div class="empty-icon">⛳</div><div class="empty-title">記録がありません</div><div class="empty-sub">最初のラウンドを記録しましょう</div><button class="btn-save-all" style="max-width:180px;margin:0 auto;display:block" onclick="startNewRound()">＋ 記録を追加</button></div>';
+  var q = (document.getElementById('search-input')||{value:''}).value.trim().toLowerCase();
+  var displayRecords = q ? records.filter(function(r){
+    return (r.course||'').toLowerCase().indexOf(q)>-1 ||
+           (r.roundName||'').toLowerCase().indexOf(q)>-1 ||
+           (r.date||'').indexOf(q)>-1;
+  }) : records;
+
+  if(!displayRecords.length){
+    el.innerHTML = q
+      ? '<div class="card empty"><div class="empty-icon">🔍</div><div class="empty-title">「'+q+'」に一致する記録がありません</div></div>'
+      : '<div class="card empty"><div class="empty-icon">⛳</div><div class="empty-title">記録がありません</div><div class="empty-sub">最初のラウンドを記録しましょう</div><button class="btn-save-all" style="max-width:180px;margin:0 auto;display:block" onclick="startNewRound()">＋ 記録を追加</button></div>';
     return;
   }
-  el.innerHTML=records.slice().sort(function(a,b){
+  el.innerHTML=displayRecords.slice().sort(function(a,b){
     var da=a.date.replace(/\//g,'-'), db=b.date.replace(/\//g,'-');
     return da>db?-1:da<db?1:0;
   }).map(function(r){
@@ -2398,25 +2407,6 @@ function clearSearch(){
   document.getElementById('search-input').value='';
   renderList();
 }
-
-// renderList に検索フィルターを適用（既存関数を上書き）
-var _origRenderList = renderList;
-renderList = function(){
-  var q = (document.getElementById('search-input')||{value:''}).value.trim().toLowerCase();
-  if(!q){ _origRenderList(); return; }
-  var el=document.getElementById('list-body');
-  var filtered=records.filter(function(r){
-    return (r.course||'').toLowerCase().indexOf(q)>-1 ||
-           (r.roundName||'').toLowerCase().indexOf(q)>-1 ||
-           (r.date||'').indexOf(q)>-1;
-  });
-  if(!filtered.length){
-    el.innerHTML='<div class="card empty"><div class="empty-icon">🔍</div><div class="empty-title">「'+q+'」に一致する記録がありません</div></div>';
-    return;
-  }
-  // 一時的に records を filtered に差し替えて描画
-  var orig=records; records=filtered; _origRenderList(); records=orig;
-};
 
 // ---- Onboarding ----
 function initOnboard(){
